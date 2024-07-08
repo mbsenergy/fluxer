@@ -1,5 +1,9 @@
 # fluxer
- DATAFLUX collection of functions and utilities
+DATAFLUX collection of functions and utilities
+
+## Notion Page
+DATAFLUX/Backend/fluxer package
+
 
 
 ## Develop
