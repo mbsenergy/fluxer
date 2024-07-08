@@ -78,3 +78,71 @@ query_mongo = function(collection_name, filter_list = NULL, sort_list = list("DA
         stop("Invalid value for 'output' parameter. Must be 'SIMPLE' or 'RAW'.")
     }
 }
+
+
+
+#' Generate MongoDB Projection String
+#'
+#' This function generates a MongoDB projection string from a vector of field names.
+#'
+#' @param v_field A character vector of field names to include in the projection.
+#' @return A JSON string representing the MongoDB projection.
+#' @export
+fun_fields = function(v_field) {
+    if (missing(v_field) || !is.character(v_field)) {
+        stop("The 'v_field' parameter is required and must be a character vector.")
+    }
+
+    paste0('{"', paste(v_field, collapse = '": true, "'), '": true}')
+}
+
+
+
+#' Generate MongoDB Date Range Query
+#'
+#' This function generates a MongoDB query string for a date range.
+#'
+#' @param field_name The name of the date field to query.
+#' @param start_date The start date of the range.
+#' @param end_date The end date of the range.
+#' @return A JSON string representing the MongoDB date range query.
+#' @export
+fun_query_date = function(field_name, start_date, end_date) {
+    if (missing(field_name) || !is.character(field_name)) {
+        stop("The 'field_name' parameter is required and must be a character string.")
+    }
+
+    start_date_tmp = as.POSIXct(as.Date(start_date), tz = "UTC")
+    end_date_tmp = as.POSIXct(as.Date(end_date), tz = "UTC")
+
+    paste(
+        '"',
+        field_name, '": {',
+        '"$gte": { "$date": "', format(start_date_tmp, "%Y-%m-%dT%H:%M:%S.000Z"), '" }, ',
+        '"$lte": { "$date": "', format(end_date_tmp, "%Y-%m-%dT%H:%M:%S.000Z"), '" }',
+        '}',
+        sep = ''
+    )
+}
+
+
+
+#' Generate MongoDB Query for List of Values
+#'
+#' This function generates a MongoDB query string for a list of values.
+#'
+#' @param field_name The name of the field to query.
+#' @param v_values A vector of values to include in the query.
+#' @return A JSON string representing the MongoDB query for the list of values.
+#' @export
+fun_query_fl = function(field_name, v_values) {
+    if (missing(field_name) || !is.character(field_name)) {
+        stop("The 'field_name' parameter is required and must be a character string.")
+    }
+
+    if (missing(v_values) || !is.vector(v_values)) {
+        stop("The 'v_values' parameter is required and must be a vector.")
+    }
+
+    paste0('"' ,field_name, '":{"$in": [', paste0('"', v_values, '"', collapse = ','), ']}')
+}
