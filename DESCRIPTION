@@ -1,0 +1,25 @@
+Package: fluxer
+Type: Package
+Title: DATAFLUX collection of functions and utilities
+Version: 0.1.0
+Authors@R: 
+    person(given = "Alejandro", 
+           family = "Abraham", 
+           role = c("aut", "cre"),
+           email = "alejandro.abraham@cerved.com")
+Description: It is a repository to use programmatically R for DATAFLUX only.
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
+Roxygen: list(markdown = TRUE)
+Imports: 
+    data.table,
+    mongolite,
+    httr2,
+    magrittr
+Suggests:
+    roxygen2,
+    devtools,
+    usethis
+RoxygenNote: 7.3.2
+
