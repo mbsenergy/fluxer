@@ -1,6 +1,6 @@
 Package: fluxer
 Type: Package
-Title: DATAFLUX collection of functions and utilities
+Title: FLUX collection of functions and utilities
 Version: 0.1.0
 Authors@R: 
     person(given = "Alejandro", 
@@ -14,7 +14,10 @@ LazyData: true
 Roxygen: list(markdown = TRUE)
 Imports: 
     data.table,
-    mongolite,
+    DBI,
+    emayili,
+    duckdb,
+    htmltools,
     httr2,
     jsonlite,
     magrittr
@@ -24,4 +27,4 @@ Suggests:
     usethis
 RoxygenNote: 7.3.2
 Depends: 
-    R (>= 2.10)
+    R (>= 4.1.0)
