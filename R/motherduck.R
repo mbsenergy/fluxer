@@ -184,3 +184,217 @@ check_table_md = function(connection, table_name) {
 }
 
 
+#' Create a Table in MotherDuck Database Dynamically
+#'
+#' This function creates a new table in a specified MotherDuck database
+#' based on the column names and types of the input data.
+#'
+#' @param conn A valid DuckDB connection object.
+#' @param database_name The name of the MotherDuck database where the table will be created.
+#' @param table_name A character string representing the name of the new table.
+#' @param data A data frame or data table (`dt_all[[i]]`) from which column names and types are derived.
+#'
+#' @return TRUE if the table is successfully created, FALSE otherwise.
+#' @examples
+#' \dontrun{
+#'   create_table_md(conn, "economics_db", "new_table", dt_all[[i]])
+#' }
+#' @export
+create_table_md <- function(conn, database_name, table_name, data) {
+
+    # Check if the connection is valid
+    if (!isTRUE(DBI::dbIsValid(conn))) {
+        stop("Connection is invalid or closed.")
+    }
+
+    # Ensure the table name and database name are not empty
+    if (missing(database_name) || missing(table_name) || missing(data)) {
+        stop("Database name, table name, and data must be provided.")
+    }
+
+    # Generate the column names and their SQL data types based on the input data
+    cols <- colnames(data)
+    types <- sapply(data, function(col) {
+        if (is.integer(col)) {
+            return("INTEGER")
+        } else if (is.numeric(col)) {
+            return("DOUBLE")
+        } else if (is.character(col)) {
+            return("VARCHAR")
+        } else if (is.logical(col)) {
+            return("BOOLEAN")
+        } else {
+            stop("Unsupported data type detected.")
+        }
+    })
+
+    # Combine column names and their types into a SQL string
+    col_definitions <- paste(cols, types, collapse = ", ")
+
+    # Build the full SQL CREATE TABLE statement
+    create_table_query <- glue::glue_sql(
+        "CREATE TABLE {`database_name`}.{`table_name`} ({col_definitions});",
+        .con = conn
+    )
+
+    # Execute the SQL statement to create the table
+    tryCatch({
+        DBI::dbExecute(conn, create_table_query)
+        message(glue("{crayon::bgGreen('[OK]')} Table '{table_name}' created successfully in '{database_name}'."))
+        return(TRUE)
+    }, error = function(e) {
+        message(glue("{crayon::bgRed('[ERROR]')} Failed to create table '{table_name}' in '{database_name}': {e$message}"))
+        return(FALSE)
+    })
+}
+
+#' Append Data to a Table in a Database
+#'
+#' This function appends data from a given data frame to a specified table in a database.
+#' It checks if the database connection is valid, ensures that necessary parameters are provided,
+#' constructs an SQL `INSERT` statement, and executes the insertion for each row of data.
+#' The function provides feedback on the success of the operation, including how many rows
+#' were successfully inserted.
+#'
+#' @param conn A DBI connection object to the database where the table is located.
+#' @param database_name A string representing the name of the database.
+#' @param table_name A string representing the name of the table to which data will be appended.
+#' @param data A data frame containing the data to be appended to the specified table.
+#'
+#' @return Returns a logical value indicating whether all rows were appended successfully.
+#'         It returns `TRUE` if all rows were inserted, and `FALSE` otherwise.
+#'
+#' @details
+#' - The function validates the database connection and checks for the presence of required parameters.
+#' - It constructs an SQL `INSERT` statement with placeholders for the row values.
+#' - The insertion is performed row by row, and the function counts the number of successful inserts.
+#' - If any errors occur during the insertion process, an error message is displayed,
+#'   and the function returns `FALSE`.
+#' - At the end of the operation, the function checks if all rows were inserted and provides
+#'   an appropriate message indicating the number of rows appended.
+#'
+#' @examples
+#' \dontrun{
+#'   # Assuming 'conn' is a valid DBI connection, 'data_to_append' is a data frame
+#'   append_to_table_md(conn, "my_database", "my_table", data_to_append)
+#' }
+#'
+#' @export
+#'
+append_to_table_md <- function(conn, database_name, table_name, data) {
+
+    # Check if the connection is valid
+    if (!isTRUE(DBI::dbIsValid(conn))) {
+        stop("Connection is invalid or closed.")
+    }
+
+    # Ensure the table name, database name, and data are provided
+    if (missing(database_name) || missing(table_name) || missing(data)) {
+        stop("Database name, table name, and data must be provided.")
+    }
+
+    # Define column names and types, ensuring no single quotes
+    # Create the column definitions as a single string
+    column_definitions <- paste(DBI::dbQuoteIdentifier(conn, names(data)), collapse = ", ")
+
+    # Create the SQL string for inserting data
+    string_sql_a <- sprintf("INSERT INTO %s.%s", database_name, table_name)
+
+    # Create the string for the column definitions
+    string_sql_b <- sprintf("(%s) VALUES ", column_definitions)
+
+    # Combine both parts into the full SQL command
+    insert_query_template <- paste(string_sql_a, string_sql_b)
+
+    # Prepare the SQL command
+    insert_query <- insert_query_template
+
+    successful_inserts <- 0
+
+    tryCatch({
+        for (i in 1:nrow(data)) {
+            row_values <- unname(as.list(data[i, ]))  # Create an unnamed list
+            # Create the placeholders for parameter binding
+            value_placeholders <- paste(rep("?", length(row_values)), collapse = ", ")
+            value_placeholders <- paste0("(", value_placeholders, ')')
+            full_insert_query <- paste(insert_query, value_placeholders)
+            # Execute the query with the current row's values
+            print(paste("Pushed:", i, 'of ', nrow(data)))
+            DBI::dbExecute(conn, full_insert_query, params = row_values)
+            successful_inserts <- successful_inserts + 1  # Increment success counter
+        }
+
+    }, error = function(e) {
+        success = FALSE
+        message(glue("{crayon::bgRed('[ERROR]')} Failed to append data to table '{table_name}' in '{database_name}': {e$message}"))
+        return(success)
+    })
+
+    message(glue("{crayon::bgGreen('[OK]')} Data appended successfully to table '{table_name}' in '{database_name}'."))
+
+    # Check if all rows were inserted successfully
+    if (successful_inserts == nrow(data)) {
+        success = TRUE
+        message(glue("{crayon::bgGreen('[OK]')} All {successful_inserts} rows appended successfully to table '{table_name}' in '{database_name}'."))
+        return(success)
+    } else {
+        success = FALSE
+        message(glue("{crayon::bgRed('[WARNING]')} Only {successful_inserts} out of {nrow(data)} rows were appended to table '{table_name}' in '{database_name}'."))
+        return(success)
+    }
+}
+
+
+#' Retrieve the Last Date from a Table in a Database
+#'
+#' This function retrieves the most recent date from a specified table in a database.
+#' It executes a SQL query that orders the data by the date column in descending order
+#' and limits the results to one record. This is useful for determining the latest
+#' entry in time series data or for managing data updates.
+#'
+#' @param con A DBI connection object to the database from which to retrieve data.
+#' @param database_name A string representing the name of the database.
+#' @param table_name A string representing the name of the table from which to retrieve the date.
+#' @param verbose A logical value indicating whether to print the result of the query.
+#'        Defaults to `FALSE`.
+#'
+#' @return A data frame containing the most recent row of data from the specified table,
+#'         or `NULL` if the query fails.
+#'
+#' @details
+#' - The function constructs a SQL `SELECT` statement to fetch all columns from the specified
+#'   table, ordering the results by the `DATE` column in descending order.
+#' - If the query is successful, the result is printed if `verbose` is set to `TRUE`,
+#'   and the result is returned as a data frame.
+#' - If an error occurs during the execution of the query, an error message is displayed,
+#'   and the function returns `NULL`.
+#'
+#' @examples
+#' \dontrun{
+#'   # Assuming 'con' is a valid DBI connection
+#'   last_date <- get_last_date_sql(con, "my_database", "my_table", verbose = TRUE)
+#'   print(last_date)
+#' }
+#'
+#' @export
+
+get_last_date_sql = function (con, database_name, table_name, verbose = FALSE) {
+    conn = con
+    query <- glue::glue_sql("SELECT * FROM {`database_name`}.{`table_name`} ORDER BY DATE DESC LIMIT 1;",
+                            .con = conn)
+    tryCatch({
+        result <- DBI::dbGetQuery(conn, query)
+        if (verbose) {
+            print(result)
+        }
+        return(result)
+    }, error = function(e) {
+        message(glue("{crayon::bgRed('[ERROR]')} Failed to retrieve data from '{table_name}': {e$message}"))
+        return(NULL)
+    })
+}
+
+
+
+
+
