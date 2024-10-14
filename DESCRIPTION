@@ -16,7 +16,6 @@ Imports:
     data.table,
     DBI,
     emayili,
-    duckdb,
     htmltools,
     httr2,
     jsonlite,
@@ -24,6 +23,7 @@ Imports:
 Suggests:
     roxygen2,
     devtools,
+    duckdb,
     usethis
 RoxygenNote: 7.3.2
 Depends: 
