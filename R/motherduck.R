@@ -38,44 +38,53 @@
 #'
 #' @export
 
-connect_md = function(store_conn = TRUE) {
+connect_md <- function(store_conn = TRUE, apikey = FALSE) {
+    # Create a DuckDB connection to local.duckdb
+    conn <- DBI::dbConnect(duckdb::duckdb(), "local.duckdb")
 
-    conn = DBI::dbConnect(duckdb::duckdb(), "local.duckdb")
+    # Install and load MotherDuck extension
     DBI::dbExecute(conn, "INSTALL 'motherduck';")
     DBI::dbExecute(conn, "LOAD 'motherduck';")
 
+    # Check if apikey is provided, otherwise fallback to environment variable
+    if (is.character(apikey)) {
+        auth_token <- apikey
+    } else {
+        auth_token <- Sys.getenv('MOTHERDUCK')
+    }
+
     # Authenticate with MotherDuck
-    auth_query = glue::glue_sql("SET motherduck_token= {`Sys.getenv('MOTHERDUCK')`};", .con = conn)
+    auth_query <- glue::glue_sql("SET motherduck_token = {`auth_token`};", .con = conn)
     DBI::dbExecute(conn, auth_query)
 
-    # Control variable to check success
-    connection_successful = FALSE
+    # Control variable to check if connection was successful
+    connection_successful <- FALSE
 
-    # Connect to MotherDuck
+    # Try connecting to MotherDuck
     tryCatch({
         DBI::dbExecute(conn, "PRAGMA MD_CONNECT")
-        connection_successful = TRUE  # Set to TRUE only if PRAGMA MD_CONNECT succeeds
+        connection_successful <- TRUE  # Set to TRUE only if PRAGMA MD_CONNECT succeeds
     }, error = function(e) {
         if (grepl("Request failed: Your request is not authenticated. Please check your MotherDuck token.", e$message)) {
-            message(glue("{crayon::bgRed('[ERROR]')} Motherduck API TOKEN is MISSING or INCORRECT."))
+            message(glue("{crayon::bgRed('[ERROR]')} MotherDuck API TOKEN is MISSING or INCORRECT."))
         } else {
             stop(e)
         }
     })
 
-    # Continue only if connection was successful
+    # If connection was successful, check if conn is valid and store in global env if needed
     if (connection_successful) {
-        if(isTRUE(DBI::dbIsValid(conn))) {
-            message(glue("{crayon::bgGreen('[OK]')} Connected to Flux Motherduck."))
+        if (isTRUE(DBI::dbIsValid(conn))) {
+            message(glue("{crayon::bgGreen('[OK]')} Connected to Flux MotherDuck."))
         } else {
-            message(glue("{crayon::bgRed('[ERROR]')} Could NOT connect to Flux Motherduck."))
+            message(glue("{crayon::bgRed('[ERROR]')} Could NOT connect to Flux MotherDuck."))
         }
 
-        if(isTRUE(store_conn)) {
+        # Store the connection in the global environment if requested
+        if (isTRUE(store_conn)) {
             assign('conn', conn, envir = .GlobalEnv)
         }
     }
-
 }
 
 
