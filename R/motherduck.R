@@ -206,11 +206,15 @@ check_table_md = function(connection, table_name, verbose = TRUE) {
     if (isTRUE(DBI::dbIsValid(conn))) {
         md_tables = DBI::dbListTables(conn)
         if (table_name %in% md_tables) {
+            if(isTRUE(verbose)) {
+                message(glue::glue("{crayon::bgGreen('[OK]')} Table '{crayon::bgGreen(table_name)}' exists."))
+            }
             return(TRUE)
-            if(isTRUE(verbose)) {message(glue::glue("{crayon::bgGreen('[OK]')} Table '{crayon::bgGreen(table_name)}' exists."))}
         } else {
-            return(FALSE)
-            if(isTRUE(verbose)) {message(glue::glue("{crayon::bgYellow('[MISSING]')} Table '{crayon::bgYellow(table_name)}' does NOT exist."))}
+            if(isTRUE(verbose)) {
+                message(glue::glue("{crayon::bgYellow('[MISSING]')} Table '{crayon::bgYellow(table_name)}' does NOT exist."))
+                return(FALSE)
+                }
         }
     } else {
         message(crayon::red("{crayon::bgRed('[ERROR]')} Connection is invalid or closed."))
