@@ -11,6 +11,8 @@
 #' @param store_conn Logical, default is `TRUE`. If `TRUE`, the function stores the
 #'   established DuckDB connection object (`conn`) in the global environment. If
 #'   `FALSE`, it does not store the connection.
+#' @param apikey Optional character. MotherDuck API token. If not provided, the
+#'   function will use the token from the environment variable `MOTHERDUCK`.
 #'
 #' @details
 #' The function first establishes a local DuckDB connection and installs and loads
@@ -37,6 +39,13 @@
 #' }
 #'
 #' @export
+#' @import DBI
+#' @import duckdb
+#' @import glue
+#' @import crayon
+#' @importFrom DBI dbConnect dbExecute dbIsValid
+#' @importFrom glue glue_sql
+#' @importFrom crayon bgGreen bgRed
 
 connect_md <- function(store_conn = TRUE, apikey = FALSE) {
     # Create a DuckDB connection to local.duckdb
@@ -66,7 +75,7 @@ connect_md <- function(store_conn = TRUE, apikey = FALSE) {
         connection_successful <- TRUE  # Set to TRUE only if PRAGMA MD_CONNECT succeeds
     }, error = function(e) {
         if (grepl("Request failed: Your request is not authenticated. Please check your MotherDuck token.", e$message)) {
-            message(glue("{crayon::bgRed('[ERROR]')} MotherDuck API TOKEN is MISSING or INCORRECT."))
+            message(glue::glue("{crayon::bgRed('[ERROR]')} MotherDuck API TOKEN is MISSING or INCORRECT."))
         } else {
             stop(e)
         }
@@ -75,9 +84,9 @@ connect_md <- function(store_conn = TRUE, apikey = FALSE) {
     # If connection was successful, check if conn is valid and store in global env if needed
     if (connection_successful) {
         if (isTRUE(DBI::dbIsValid(conn))) {
-            message(glue("{crayon::bgGreen('[OK]')} Connected to Flux MotherDuck."))
+            message(glue::glue("{crayon::bgGreen('[OK]')} Connected to Flux MotherDuck."))
         } else {
-            message(glue("{crayon::bgRed('[ERROR]')} Could NOT connect to Flux MotherDuck."))
+            message(glue::glue("{crayon::bgRed('[ERROR]')} Could NOT connect to Flux MotherDuck."))
         }
 
         # Store the connection in the global environment if requested
@@ -120,6 +129,15 @@ connect_md <- function(store_conn = TRUE, apikey = FALSE) {
 #' }
 #'
 #' @export
+#' @import DBI
+#' @import glue
+#' @import crayon
+#' @import data.table
+#' @importFrom DBI dbGetQuery dbIsValid
+#' @importFrom glue glue
+#' @importFrom crayon bgGreen bgYellow bgRed red
+#' @importFrom data.table as.data.table
+
 check_database_md = function(connection, database_name) {
 
     conn = connection
@@ -128,10 +146,10 @@ check_database_md = function(connection, database_name) {
         md_databases = DBI::dbGetQuery(conn, 'select * from MD_ALL_DATABASES();') %>% as.data.table()
         md_databases = md_databases[type == 'motherduck' & is_attached == TRUE]$alias
         if (database_name %in% md_databases) {
-            message(glue("{crayon::bgGreen('[OK]')} Database '{crayon::bgGreen(database_name)}' exists."))
+            message(glue::glue("{crayon::bgGreen('[OK]')} Database '{crayon::bgGreen(database_name)}' exists."))
             return(TRUE)
         } else {
-            message(glue("{crayon::bgYellow('[MISSING]')} Database '{crayon::bgYellow(database_name)}'does NOT exist."))
+            message(glue::glue("{crayon::bgYellow('[MISSING]')} Database '{crayon::bgYellow(database_name)}' does NOT exist."))
             return(FALSE)
         }
     } else {
@@ -172,6 +190,13 @@ check_database_md = function(connection, database_name) {
 #' }
 #'
 #' @export
+#' @import DBI
+#' @import glue
+#' @import crayon
+#' @importFrom DBI dbListTables dbIsValid
+#' @importFrom glue glue
+#' @importFrom crayon bgGreen bgYellow bgRed red
+
 check_table_md = function(connection, table_name) {
 
     conn = connection
@@ -179,21 +204,21 @@ check_table_md = function(connection, table_name) {
     if (isTRUE(DBI::dbIsValid(conn))) {
         md_tables = DBI::dbListTables(conn)
         if (table_name %in% md_tables) {
-            message(glue("{crayon::bgGreen('[OK]')} Table '{crayon::bgGreen(table_name)}' exists."))
+            message(glue::glue("{crayon::bgGreen('[OK]')} Table '{crayon::bgGreen(table_name)}' exists."))
             return(TRUE)
         } else {
-            message(glue("{crayon::bgYellow('[MISSING]')} Table '{crayon::bgYellow(table_name)}' does NOT exist."))
+            message(glue::glue("{crayon::bgYellow('[MISSING]')} Table '{crayon::bgYellow(table_name)}' does NOT exist."))
             return(FALSE)
         }
     } else {
         message(crayon::red("{crayon::bgRed('[ERROR]')} Connection is invalid or closed."))
         return(FALSE)
     }
-
 }
 
 
-#' Create a Table in MotherDuck Database Dynamically
+
+#' Create an Empty Table in MotherDuck Database Dynamically
 #'
 #' This function creates a new table in a specified MotherDuck database
 #' based on the column names and types of the input data.
@@ -206,10 +231,10 @@ check_table_md = function(connection, table_name) {
 #' @return TRUE if the table is successfully created, FALSE otherwise.
 #' @examples
 #' \dontrun{
-#'   create_table_md(conn, "economics_db", "new_table", dt_all[[i]])
+#'   create_empty_table_md(conn, "economics_db", "new_table", mtcars)
 #' }
 #' @export
-create_table_md <- function(conn, database_name, table_name, data) {
+create_empty_table_md <- function(conn, database_name, table_name, data) {
 
     # Check if the connection is valid
     if (!isTRUE(DBI::dbIsValid(conn))) {
@@ -249,108 +274,12 @@ create_table_md <- function(conn, database_name, table_name, data) {
     # Execute the SQL statement to create the table
     tryCatch({
         DBI::dbExecute(conn, create_table_query)
-        message(glue("{crayon::bgGreen('[OK]')} Table '{table_name}' created successfully in '{database_name}'."))
+        message(glue::glue("{crayon::bgGreen('[OK]')} Table '{table_name}' created successfully in '{database_name}'."))
         return(TRUE)
     }, error = function(e) {
-        message(glue("{crayon::bgRed('[ERROR]')} Failed to create table '{table_name}' in '{database_name}': {e$message}"))
+        message(glue::glue("{crayon::bgRed('[ERROR]')} Failed to create table '{table_name}' in '{database_name}': {e$message}"))
         return(FALSE)
     })
-}
-
-#' Append Data to a Table in a Database
-#'
-#' This function appends data from a given data frame to a specified table in a database.
-#' It checks if the database connection is valid, ensures that necessary parameters are provided,
-#' constructs an SQL `INSERT` statement, and executes the insertion for each row of data.
-#' The function provides feedback on the success of the operation, including how many rows
-#' were successfully inserted.
-#'
-#' @param conn A DBI connection object to the database where the table is located.
-#' @param database_name A string representing the name of the database.
-#' @param table_name A string representing the name of the table to which data will be appended.
-#' @param data A data frame containing the data to be appended to the specified table.
-#'
-#' @return Returns a logical value indicating whether all rows were appended successfully.
-#'         It returns `TRUE` if all rows were inserted, and `FALSE` otherwise.
-#'
-#' @details
-#' - The function validates the database connection and checks for the presence of required parameters.
-#' - It constructs an SQL `INSERT` statement with placeholders for the row values.
-#' - The insertion is performed row by row, and the function counts the number of successful inserts.
-#' - If any errors occur during the insertion process, an error message is displayed,
-#'   and the function returns `FALSE`.
-#' - At the end of the operation, the function checks if all rows were inserted and provides
-#'   an appropriate message indicating the number of rows appended.
-#'
-#' @examples
-#' \dontrun{
-#'   # Assuming 'conn' is a valid DBI connection, 'data_to_append' is a data frame
-#'   append_to_table_md(conn, "my_database", "my_table", data_to_append)
-#' }
-#'
-#' @export
-#'
-append_to_table_md <- function(conn, database_name, table_name, data) {
-
-    # Check if the connection is valid
-    if (!isTRUE(DBI::dbIsValid(conn))) {
-        stop("Connection is invalid or closed.")
-    }
-
-    # Ensure the table name, database name, and data are provided
-    if (missing(database_name) || missing(table_name) || missing(data)) {
-        stop("Database name, table name, and data must be provided.")
-    }
-
-    # Define column names and types, ensuring no single quotes
-    # Create the column definitions as a single string
-    column_definitions <- paste(DBI::dbQuoteIdentifier(conn, names(data)), collapse = ", ")
-
-    # Create the SQL string for inserting data
-    string_sql_a <- sprintf("INSERT INTO %s.%s", database_name, table_name)
-
-    # Create the string for the column definitions
-    string_sql_b <- sprintf("(%s) VALUES ", column_definitions)
-
-    # Combine both parts into the full SQL command
-    insert_query_template <- paste(string_sql_a, string_sql_b)
-
-    # Prepare the SQL command
-    insert_query <- insert_query_template
-
-    successful_inserts <- 0
-
-    tryCatch({
-        for (i in 1:nrow(data)) {
-            row_values <- unname(as.list(data[i, ]))  # Create an unnamed list
-            # Create the placeholders for parameter binding
-            value_placeholders <- paste(rep("?", length(row_values)), collapse = ", ")
-            value_placeholders <- paste0("(", value_placeholders, ')')
-            full_insert_query <- paste(insert_query, value_placeholders)
-            # Execute the query with the current row's values
-            print(paste("Pushed:", i, 'of ', nrow(data)))
-            DBI::dbExecute(conn, full_insert_query, params = row_values)
-            successful_inserts <- successful_inserts + 1  # Increment success counter
-        }
-
-    }, error = function(e) {
-        success = FALSE
-        message(glue("{crayon::bgRed('[ERROR]')} Failed to append data to table '{table_name}' in '{database_name}': {e$message}"))
-        return(success)
-    })
-
-    message(glue("{crayon::bgGreen('[OK]')} Data appended successfully to table '{table_name}' in '{database_name}'."))
-
-    # Check if all rows were inserted successfully
-    if (successful_inserts == nrow(data)) {
-        success = TRUE
-        message(glue("{crayon::bgGreen('[OK]')} All {successful_inserts} rows appended successfully to table '{table_name}' in '{database_name}'."))
-        return(success)
-    } else {
-        success = FALSE
-        message(glue("{crayon::bgRed('[WARNING]')} Only {successful_inserts} out of {nrow(data)} rows were appended to table '{table_name}' in '{database_name}'."))
-        return(success)
-    }
 }
 
 
@@ -386,22 +315,40 @@ append_to_table_md <- function(conn, database_name, table_name, data) {
 #' }
 #'
 #' @export
+#' @import DBI
+#' @import glue
+#' @import crayon
+#' @importFrom DBI dbGetQuery
+#' @importFrom glue glue_sql
+#' @importFrom crayon bgRed
 
 get_last_date_sql = function (con, database_name, table_name, verbose = FALSE) {
-    conn = con
+
+    # Ensure the connection is valid
+    if (!isTRUE(DBI::dbIsValid(con))) {
+        stop("The connection is invalid or closed.")
+    }
+
+    # Create the query
     query <- glue::glue_sql("SELECT * FROM {`database_name`}.{`table_name`} ORDER BY DATE DESC LIMIT 1;",
-                            .con = conn)
+                            .con = con)
+
+    # Execute the query with error handling
     tryCatch({
-        result <- DBI::dbGetQuery(conn, query)
+        result <- DBI::dbGetQuery(con, query)
+
+        # Print the result if verbose is TRUE
         if (verbose) {
             print(result)
         }
         return(result)
+
     }, error = function(e) {
-        message(glue("{crayon::bgRed('[ERROR]')} Failed to retrieve data from '{table_name}': {e$message}"))
+        message(glue::glue("{crayon::bgRed('[ERROR]')} Failed to retrieve data from '{table_name}': {e$message}"))
         return(NULL)
     })
 }
+
 
 
 

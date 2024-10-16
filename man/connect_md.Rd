@@ -4,12 +4,15 @@
 \alias{connect_md}
 \title{Connect to a MotherDuck Database}
 \usage{
-connect_md(store_conn = TRUE)
+connect_md(store_conn = TRUE, apikey = FALSE)
 }
 \arguments{
 \item{store_conn}{Logical, default is \code{TRUE}. If \code{TRUE}, the function stores the
 established DuckDB connection object (\code{conn}) in the global environment. If
 \code{FALSE}, it does not store the connection.}
+
+\item{apikey}{Optional character. MotherDuck API token. If not provided, the
+function will use the token from the environment variable \code{MOTHERDUCK}.}
 }
 \value{
 The function returns no value but will optionally store the \code{conn} object
