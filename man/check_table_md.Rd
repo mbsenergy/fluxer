@@ -4,13 +4,15 @@
 \alias{check_table_md}
 \title{Check if a Table Exists in a MotherDuck Database}
 \usage{
-check_table_md(connection, table_name)
+check_table_md(connection, table_name, verbose = TRUE)
 }
 \arguments{
 \item{connection}{A valid DuckDB connection object, typically returned by
 \code{DBI::dbConnect()}. This connection must be established and remain active.}
 
 \item{table_name}{A character string representing the name of the table you want to check.}
+
+\item{verbose}{A bolean to print messages}
 }
 \value{
 A logical value:

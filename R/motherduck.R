@@ -143,7 +143,8 @@ check_database_md = function(connection, database_name) {
     conn = connection
 
     if (isTRUE(DBI::dbIsValid(conn))) {
-        md_databases = DBI::dbGetQuery(conn, 'select * from MD_ALL_DATABASES();') %>% as.data.table()
+        md_databases = DBI::dbGetQuery(conn, 'SELECT * FROM MD_ALL_DATABASES();')
+        md_databases = md_databases %>% as.data.table()
         md_databases = md_databases[type == 'motherduck' & is_attached == TRUE]$alias
         if (database_name %in% md_databases) {
             message(glue::glue("{crayon::bgGreen('[OK]')} Database '{crayon::bgGreen(database_name)}' exists."))
@@ -168,6 +169,7 @@ check_database_md = function(connection, database_name) {
 #' @param connection A valid DuckDB connection object, typically returned by
 #'   `DBI::dbConnect()`. This connection must be established and remain active.
 #' @param table_name A character string representing the name of the table you want to check.
+#' @param verbose A bolean to print messages
 #'
 #' @details
 #' The function retrieves all tables in the currently connected database using
@@ -197,18 +199,18 @@ check_database_md = function(connection, database_name) {
 #' @importFrom glue glue
 #' @importFrom crayon bgGreen bgYellow bgRed red
 
-check_table_md = function(connection, table_name) {
+check_table_md = function(connection, table_name, verbose = TRUE) {
 
     conn = connection
 
     if (isTRUE(DBI::dbIsValid(conn))) {
         md_tables = DBI::dbListTables(conn)
         if (table_name %in% md_tables) {
-            message(glue::glue("{crayon::bgGreen('[OK]')} Table '{crayon::bgGreen(table_name)}' exists."))
             return(TRUE)
+            if(isTRUE(verbose)) {message(glue::glue("{crayon::bgGreen('[OK]')} Table '{crayon::bgGreen(table_name)}' exists."))}
         } else {
-            message(glue::glue("{crayon::bgYellow('[MISSING]')} Table '{crayon::bgYellow(table_name)}' does NOT exist."))
             return(FALSE)
+            if(isTRUE(verbose)) {message(glue::glue("{crayon::bgYellow('[MISSING]')} Table '{crayon::bgYellow(table_name)}' does NOT exist."))}
         }
     } else {
         message(crayon::red("{crayon::bgRed('[ERROR]')} Connection is invalid or closed."))
@@ -322,29 +324,26 @@ create_empty_table_md <- function(conn, database_name, table_name, data) {
 #' @importFrom glue glue_sql
 #' @importFrom crayon bgRed
 
-get_last_date_sql = function (con, database_name, table_name, verbose = FALSE) {
-
-    # Ensure the connection is valid
-    if (!isTRUE(DBI::dbIsValid(con))) {
-        stop("The connection is invalid or closed.")
-    }
-
-    # Create the query
+get_last_date_sql = function(con, database_name, table_name, verbose = FALSE) {
+    conn = con
     query <- glue::glue_sql("SELECT * FROM {`database_name`}.{`table_name`} ORDER BY DATE DESC LIMIT 1;",
-                            .con = con)
+                            .con = conn)
 
-    # Execute the query with error handling
     tryCatch({
-        result <- DBI::dbGetQuery(con, query)
-
-        # Print the result if verbose is TRUE
+        result <- DBI::dbGetQuery(conn, query)
         if (verbose) {
             print(result)
         }
         return(result)
-
     }, error = function(e) {
-        message(glue::glue("{crayon::bgRed('[ERROR]')} Failed to retrieve data from '{table_name}': {e$message}"))
+        # Check if the error message contains "Catalog Error" and "Table with name"
+        if (grepl(paste0("Catalog Error: Table with name ", table_name, " does not exist"), e$message)) {
+            warning(glue("{crayon::bgYellow('[WARNING]')} Table '{table_name}' does not exist in '{database_name}'"))
+            return(NULL)
+        } else {
+            # For other errors, print the full error message
+            message(glue("{crayon::bgRed('[ERROR]')} Failed to retrieve data from '{table_name}': {e$message}"))
+        }
         return(NULL)
     })
 }
