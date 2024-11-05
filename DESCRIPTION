@@ -1,7 +1,7 @@
 Package: fluxer
 Type: Package
 Title: FLUX collection of functions and utilities
-Version: 0.1.0
+Version: 0.2.0
 Authors@R: 
     person(given = "Alejandro", 
            family = "Abraham", 
@@ -18,6 +18,10 @@ Imports:
     emayili,
     htmltools,
     httr2,
+    httr,
+    curl,
+    lubridate,
+    stringr,
     jsonlite,
     magrittr
 Suggests:
