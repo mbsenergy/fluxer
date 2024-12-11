@@ -155,31 +155,33 @@ entsoe_create_url_file = function(basis_name, year, month) {
 entsoe_list_folders = function() {
 
     req = entsoe_create_url_folders()
-
-    # Convert raw content to character
     con = rawToChar(req$content)
-
-    # Parse links into a data frame
     con_df = parse_ftp_links(con)
-
     con_df
 }
 
 
-parse_ftp_links <- function(x){
-    df_links <- as.data.frame(readr::read_fwf(file = x, readr::fwf_widths(widths = c(10, 5, 4, 10, 14, 13, 60))))
+parse_ftp_links <- function(x) {
+    x <- textConnection(x)
+    df_links <- read.fwf(file = x,
+                         widths = c(10, 5, 4, 10, 14, 13, 60),
+                         header = FALSE,
+                         stringsAsFactors = FALSE)
 
-    names(df_links) <- c("perm", "unknown1", "unknown2", "unknown3", "size", "date", "link")
-    time_or_year <- stringr::str_sub(df_links$date, start = -5)
-    time_and_year <- dplyr::if_else(!stringr::str_detect(time_or_year, " [0-9]{4}"), paste0(lubridate::year(Sys.Date()), " ", time_or_year), paste0(time_or_year, " 00:00"))
-    df_links$date <- stringr::str_replace(df_links$date, time_or_year, "")
-    df_links$date <- paste0(df_links$date, time_and_year)
-    df_links$date <- stringr::str_replace(df_links$date, "  ", " ")
-    df_links$date <- lubridate::mdy_hm(df_links$date, tz = "UTC")
+    colnames(df_links) <- c("perm", "unknown1", "unknown2", "unknown3", "size", "date", "link")
+    dt_links <- as.data.table(df_links)
 
-    df_links <- df_links[df_links$unknown1 == 2, ]
+    dt_links[, time_or_year := substr(date, nchar(date) - 4, nchar(date))]
 
-    df_links
+    current_year <- as.integer(format(Sys.Date(), "%Y"))
+    dt_links[, time_and_year := ifelse(grepl(" [0-9]{4}$", time_or_year),
+                                       time_or_year,
+                                       paste(current_year, time_or_year))]
+
+    dt_links[, date := as.Date(paste(format(Sys.Date(), "%Y"), date), format = "%Y %b %d %H:%M")]
+    dt_links <- dt_links[unknown1 == 2]
+
+    return(dt_links)
 }
 
 
@@ -229,56 +231,57 @@ parse_links <- function(x) {
 entsoe_list_files = function(basis_name) {
 
     req = entsoe_create_url_files(basis_name)
-
-    # Convert raw content to character
     con = rawToChar(req$content)
-
-    # Parse files into a data frame
     con_df = parse_ftp_files(con)
-
     con_df
 }
 
 
-parse_ftp_files <- function(x){
-    df_files <- as.data.frame(suppressWarnings(readr::read_fwf(file = x, readr::fwf_widths(widths = c(10, 5, 4, 10, 14, 13, 60)))))
+parse_ftp_files <- function(x) {
+    x <- textConnection(x)
+    df_files <- read.fwf(file = x,
+                         widths = c(10, 5, 4, 10, 14, 13, 60),
+                         header = FALSE,
+                         stringsAsFactors = FALSE)
 
-    names(df_files) <- c("perm", "unknown1", "unknown2", "unknown3", "size", "date", "file")
-    time_or_year <- stringr::str_sub(df_files$date, start = -5)
-    time_and_year <- dplyr::if_else(!stringr::str_detect(time_or_year, " [0-9]{4}"), paste0(lubridate::year(Sys.Date()), " ", time_or_year), paste0(time_or_year, " 00:00"))
-    df_files$date <- stringr::str_replace(df_files$date, time_or_year, "")
-    df_files$date <- paste0(df_files$date, time_and_year)
-    df_files$date <- stringr::str_replace(df_files$date, "  ", " ")
-    df_files$date <- lubridate::mdy_hm(df_files$date, tz = "UTC")
+    colnames(df_files) <- c("perm", "unknown1", "unknown2", "unknown3", "size", "date", "file")
 
-    df_files <- df_files[df_files$unknown1 == 1, ]
+    dt_files <- as.data.table(df_files)
+    dt_files[, time_or_year := substr(date, nchar(date) - 4, nchar(date))]
 
-    df_files
+    current_year <- as.integer(format(Sys.Date(), "%Y"))
+    dt_files[, time_and_year := ifelse(grepl(" [0-9]{4}$", time_or_year),
+                                       time_or_year,
+                                       paste(current_year, time_or_year))]
+
+    dt_links[, date := as.Date(paste(format(Sys.Date(), "%Y"), date), format = "%Y %b %d %H:%M")]
+
+    dt_files <- dt_files[unknown1 == 1]
+    return(dt_files)
 }
 
 
 
 parse_files <- function(x) {
+    lines <- strsplit(x, "\n")[[1]]
 
-    x <- strsplit(x, "\n")[[1]]
+    parsed <- lapply(lines, function(line) {
+        list(
+            perm = regmatches(line, regexpr("^[a-z-]+", line)),
+            dir = regmatches(line, regexpr("[0-9][[:space:]][a-z]+", line)),
+            size = regmatches(line, regexec("[0-9]{2,}", line))[[1]][2],
+            date = regmatches(line, regexpr("[A-Za-z]{3}\\s+[0-9]{1,2}\\s+([0-9]{2}:[0-9]{2}|[0-9]{4})", line)),
+            file = regmatches(line, regexpr("[A-Za-z0-9_.-]+$", line))
+        )
+    })
 
-    x <-
-        lapply(x, function(z) {
-            perm <- strex(z, "^[a-z-]+")
-            dir <- strex(z, "[0-9][[:space:]][a-z]+")
-            #group <- strex(z, "csdb-ops|1005")
-            size <- strexg(z, "[0-9]{2,}")[[1]][2]
-            date <- strex(z, "[A-Za-z]{3}[[:space:]]+[0-9]{1,2}[[:space:]]+[0-9]{2}:[0-9]{2}|[A-Za-z]{3}[[:space:]]+[0-9]{1,2}[[:space:]]+[0-9]{4}")
-            file <- strex(z, "[A-Za-z0-9_.-]+$")
-            tmp <- list(perm = perm, dir = dir,
-                        #group = group,
-                        size = size,
-                        date = date, file = file)
-            tmp[vapply(tmp, length, 1) == 0] <- ""
-            tmp
-        })
+    parsed <- lapply(parsed, function(row) {
+        row[vapply(row, length, 1) == 0] <- ""
+        row
+    })
 
-    x
+    dt_parsed <- rbindlist(parsed, fill = TRUE)
+    return(dt_parsed)
 }
 
 

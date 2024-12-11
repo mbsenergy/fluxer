@@ -1,7 +1,7 @@
 Package: fluxer
 Type: Package
 Title: FLUX collection of functions and utilities
-Version: 0.2.0
+Version: 0.3.0
 Authors@R: 
     person(given = "Alejandro", 
            family = "Abraham", 
@@ -15,14 +15,13 @@ Roxygen: list(markdown = TRUE)
 Imports: 
     data.table,
     DBI,
-    emayili,
     htmltools,
-    httr2,
     httr,
     curl,
-    lubridate,
-    stringr,
     jsonlite,
+    xml2,
+    crayon,
+    glue,
     magrittr
 Suggests:
     roxygen2,
@@ -31,4 +30,4 @@ Suggests:
     usethis
 RoxygenNote: 7.3.2
 Depends: 
-    R (>= 4.1.0)
+    R (>= 4.4.0)
