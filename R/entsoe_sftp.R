@@ -21,7 +21,7 @@
 #' }
 #'
 #' @export
-download_entsoe_file <- function(basis_name, year, month, user = Sys.getenv("ENTSOE_USER"), password = Sys.getenv("ENTSOE_PASSWORD"), output_file) {
+entsoe_download_file <- function(basis_name, year, month, user = Sys.getenv("ENTSOE_USER"), password = Sys.getenv("ENTSOE_PASSWORD"), output_file) {
 
     # Construct the file URL
     file_url <- paste0("sftp://sftp-transparency.entsoe.eu/TP_export/",
@@ -254,7 +254,7 @@ parse_ftp_files <- function(x) {
                                        time_or_year,
                                        paste(current_year, time_or_year))]
 
-    dt_links[, date := as.Date(paste(format(Sys.Date(), "%Y"), date), format = "%Y %b %d %H:%M")]
+    dt_files[, date := as.Date(paste(format(Sys.Date(), "%Y"), date), format = "%Y %b %d %H:%M")]
 
     dt_files <- dt_files[unknown1 == 1]
     return(dt_files)
