@@ -38,7 +38,7 @@
 entsoe_dam_prices = function(country, from_data, to_data, api_key = Sys.getenv('ENTSOE_KEY')) {
 
   # Translate the country to the EIC code using the entsoe_countries mapping
-  entsoe_domain = entsoe_countries[COUNTRY == country]$EIC_CODE
+  entsoe_domain = entsoe_countries[CODE_ENTSOE == country]$CODE_EIC
 
   # Format the start and end period times for the API request
   period_start <- paste0(format(as.Date(from_data), "%Y%m%d"), "0000")
@@ -73,8 +73,12 @@ entsoe_dam_prices = function(country, from_data, to_data, api_key = Sys.getenv('
   result <- extract_xml_data(res_content)
 
   # Process the extracted data and format it
-  DT = result[, .(COUNTRY = country, DATE = format(suppressWarnings(strptime(StartTime, "%Y-%m-%dT%H:%MZ")), "%Y-%m-%d"),
+  DT = result[, .(CODE_ENTSOE = country, DATE = format(suppressWarnings(strptime(StartTime, "%Y-%m-%dT%H:%MZ")), "%Y-%m-%d"),
                   HOUR = Position, VALUE = Price, UNIT = 'EUR')]
+
+  DT = merge(DT, entsoe_countries[, .(COUNTRY, CODE_ENTSOE)], by = 'CODE_ENTSOE', all.x = TRUE)
+
+  setcolorder(DT, neworder = c('COUNTRY', 'CODE_ENTSOE', 'DATE', 'HOUR', 'VALUE', 'UNIT'))
 
   # Display a success message with formatting using glue and crayon
   message <- glue("[{crayon::bold('OK')}] DATA for {crayon::bold(country)} from {crayon::bold(from_data)} to {crayon::bold(to_data)} retrieved correctly")

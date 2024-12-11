@@ -5,7 +5,7 @@
 \alias{entsoe_countries}
 \title{List of Mapped Countries for DAM Prices}
 \format{
-An object of class \code{data.table} (inherits from \code{data.frame}) with 43 rows and 2 columns.
+An object of class \code{data.table} (inherits from \code{data.frame}) with 43 rows and 5 columns.
 }
 \usage{
 entsoe_countries

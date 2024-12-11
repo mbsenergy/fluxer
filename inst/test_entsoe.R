@@ -6,14 +6,13 @@ devtools::load_all()
 
 # 1. API Method ---------------------------------------------
 
-## entsoe_list_folders ----------------------
+## DAM Prices ----------------------
 
-dts_1 = entsoe_list_folders()
-dts_1 %>% head()
-# req = entsoe_create_url_folders(user = Sys.getenv('ENTSOE_USER'), psw = Sys.getenv('ENTSOE_PASSWORD'))
-# con = rawToChar(req$content)
-# con_df = parse_ftp_links(con)
-# con_df
+country <- "Italy (North)"
+from_data <- Sys.Date() - 365
+to_data <- Sys.Date()
+dam_prices <- entsoe_dam_prices(country, from_data, to_data, api_key = Sys.getenv('ENTSOE_KEY'))
+dam_prices %>% head()
 
 # OK
 
