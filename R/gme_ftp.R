@@ -111,7 +111,13 @@ mgp_download_file <- function(filename, data_type = 'MGP_Prezzi', output_dir, us
         if (isFALSE(raw)) {
             if (data_type == 'MGP_Prezzi') {
                 result_df <- gme_dam_price_xml_to_data(output_file)
+                setcolorder(result_df, c('DATE', 'HOUR', 'MARKET', 'ZONE', 'VALUE', 'UNIT'))
             }
+            if (data_type == 'MGP_Quantita') {
+                result_df <- gme_dam_quantity_xml_to_data(output_file)
+                setcolorder(result_df, c('DATE', 'HOUR', 'MARKET', 'ZONE', 'VALUE', 'UNIT'))
+            }
+
             # Optionally remove the downloaded file after processing
         } else {
             result_df <- FALSE
@@ -225,5 +231,104 @@ gme_dam_price_xml_to_data <- function(xml_file_path) {
     data_df_lg[, UNIT := 'EUR']
 
     return(data_df_lg)
+}
+
+
+#' Process GME DAM Quantity XML Data
+#'
+#' This function processes a GME Day-Ahead Market (DAM) quantity XML file and extracts
+#' structured data, converting it into a tidy `data.table` format. It dynamically parses
+#' all quantity fields, standardizes their names, and reshapes the data into long format.
+#'
+#' @param xml_file_path A string specifying the file path to the XML file containing quantity data.
+#'
+#' @return A `data.table` in long format with the following columns:
+#' \itemize{
+#'   \item `DATE`: Date of the record (as a Date object).
+#'   \item `MARKET`: Market type, typically `MGP`.
+#'   \item `HOUR`: Hour of the record (integer).
+#'   \item `ZONE`: Zone or region (e.g., `CSUD`, `CALA`).
+#'   \item `VALUE`: Numeric value of the quantity in MWh.
+#'   \item `UNIT`: Unit of the value, default is `MWh`.
+#' }
+#'
+#' @details
+#' The function performs the following steps:
+#' \enumerate{
+#'   \item Reads the XML file and locates all `Quantita` nodes.
+#'   \item Extracts key fields (`Data`, `Mercato`, `Ora`) and dynamically captures all quantity-related fields.
+#'   \item Converts commas in values to dots for numeric compatibility.
+#'   \item Creates a wide-format `data.table` with standardized column names.
+#'   \item Reshapes the data to a long format for better analysis and visualization.
+#' }
+#'
+#' @examples
+#' \dontrun{
+#' # Process an XML file
+#' file_path <- "path/to/MGPQuantita.xml"
+#' quantita_data <- gme_dam_quantity_xml_to_data(file_path)
+#' head(quantita_data)
+#' }
+#'
+#' @import data.table
+#' @import xml2
+#' @export
+gme_dam_quantity_xml_to_data <- function(xml_file_path) {
+
+    xml_data <- read_xml(xml_file_path)
+
+    quantita_nodes <- xml_find_all(xml_data, ".//Quantita")
+
+    # Extract the data from each 'Prezzi' element
+    data_list <- lapply(quantita_nodes, function(node) {
+        data <- xml_text(xml_find_first(node, ".//Data"))
+        mercato <- xml_text(xml_find_first(node, ".//Mercato"))
+        ora <- xml_text(xml_find_first(node, ".//Ora"))
+
+        # Extract all quantity fields dynamically
+        quantity_fields <- xml_children(node)
+        quantities <- sapply(quantity_fields, function(child) {
+            value <- xml_text(child)
+            gsub(",", ".", value)  # Convert commas to dots for numeric conversion
+        })
+
+        # Combine extracted fields into a named list
+        c(list(Data = data, Mercato = mercato, Ora = ora), as.list(quantities))
+    })
+
+    # Convert the list of records into a data.table
+    data_dt <- rbindlist(data_list, fill = TRUE)
+    data_dt <- data_dt[, -(1:3), with = FALSE]
+
+    # Standardize column names
+    quantita_elements <- c('DATE', 'MARKET', 'HOUR',
+        "TOTALE_ACQUISTI", "NAT_ACQUISTI", "CALA_ACQUISTI", "CNOR_ACQUISTI",
+        "CSUD_ACQUISTI", "NORD_ACQUISTI", "SARD_ACQUISTI", "SICI_ACQUISTI",
+        "SUD_ACQUISTI", "AUST_ACQUISTI", "COAC_ACQUISTI", "COUP_ACQUISTI",
+        "CORS_ACQUISTI", "FRAN_ACQUISTI", "GREC_ACQUISTI", "SLOV_ACQUISTI",
+        "SVIZ_ACQUISTI", "BSP_ACQUISTI", "MALT_ACQUISTI", "XAUS_ACQUISTI",
+        "XFRA_ACQUISTI", "MONT_ACQUISTI", "XGRE_ACQUISTI", "TOTALE_VENDITE",
+        "NAT_VENDITE", "CALA_VENDITE", "CNOR_VENDITE", "CSUD_VENDITE",
+        "NORD_VENDITE", "SARD_VENDITE", "SICI_VENDITE", "SUD_VENDITE",
+        "AUST_VENDITE", "COAC_VENDITE", "COUP_VENDITE", "CORS_VENDITE",
+        "FRAN_VENDITE", "GREC_VENDITE", "SLOV_VENDITE", "SVIZ_VENDITE",
+        "BSP_VENDITE", "MALT_VENDITE", "XAUS_VENDITE", "XFRA_VENDITE",
+        "MONT_VENDITE", "XGRE_VENDITE", "TOTITABSP_VENDITE", "TOTITABSP_ACQUISTI"
+    )
+    setnames(data_dt, names(data_dt), quantita_elements)
+
+    # Reshape the data to long format
+    data_dt_long <- melt(data_dt, id.vars = c("DATE", "MARKET", "HOUR"),
+                         variable.name = "ZONE", value.name = "VALUE")
+
+    # Convert DATE and HOUR to proper formats
+    data_dt_long[, DATE := as.Date(DATE, format = "%Y%m%d")]
+    data_dt_long[, HOUR := as.integer(HOUR)]
+    data_dt_long[, VALUE := as.numeric(VALUE)]
+
+    # Add unit for the values
+    data_dt_long[, UNIT := "MWh"]
+
+    return(data_dt_long)
 }
 

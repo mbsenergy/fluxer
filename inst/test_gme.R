@@ -126,3 +126,11 @@ lapply(last_n_files, function(file) {
         return(NULL)
     })
 })
+
+xml_file_path = file.path('data', '20241213MGPPrezzi.xml')
+xml_data_p <- read_xml(xml_file_path)
+
+xml_file_path = file.path('data', '20241213MGPQuantita.xml')
+xml_data <- read_xml(xml_file_path)
+
+gme_dam_quantity_xml_to_data(xml_file_path)
