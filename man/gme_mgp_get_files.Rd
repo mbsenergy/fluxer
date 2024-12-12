@@ -5,7 +5,7 @@
 \title{Retrieve Files from GME FTP Server}
 \usage{
 gme_mgp_get_files(
-  data_type = "MGP_Prezzi",
+  data_type,
   output_dir = "data",
   username = "PIASARACENO",
   password = "18N15C9R",

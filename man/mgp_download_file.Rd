@@ -6,21 +6,21 @@
 \usage{
 mgp_download_file(
   filename,
+  data_type = "MGP_Prezzi",
+  output_dir,
   username,
   password,
-  output_dir,
-  data_type = "MGP_Prezzi",
   raw = FALSE
 )
 }
 \arguments{
 \item{filename}{A character string representing the name of the file to be downloaded.}
 
+\item{output_dir}{A character string representing the directory where the downloaded file will be saved.}
+
 \item{username}{A character string representing the FTP username for authentication.}
 
 \item{password}{A character string representing the FTP password for authentication.}
-
-\item{output_dir}{A character string representing the directory where the downloaded file will be saved.}
 }
 \value{
 A data frame (or \code{NULL} in case of an error). The data frame contains the processed data

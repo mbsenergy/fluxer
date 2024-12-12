@@ -18,13 +18,14 @@
 #' files <- gme_mgp_get_files(data_type = "MGP_Prezzi", verbose = TRUE)
 #' }
 #' @export
-gme_mgp_get_files <- function(data_type = "MGP_Prezzi", output_dir = "data",
+gme_mgp_get_files <- function(data_type, output_dir = "data",
                               username = "PIASARACENO", password = "18N15C9R",
                               verbose = FALSE) {
 
     url_base = paste0('ftp://download.mercatoelettrico.org/MercatiElettrici/', data_type, '/')
 
-    file_pattern <- if (data_type == "MGP_Prezzi") "\\S+MGPPrezzi\\.xml$" else paste0("\\S+", data_type, "\\.xml$")
+    if (data_type == "MGP_Prezzi") {file_pattern = "\\S+MGPPrezzi\\.xml$"}
+    if (data_type == "MGP_Quantita") {file_pattern = "\\S+MGPQuantita\\.xml$"}
 
     # Ensure output directory exists
     if (!dir.exists(output_dir)) {
@@ -100,33 +101,42 @@ mgp_download_file <- function(filename, data_type = 'MGP_Prezzi', output_dir, us
                             ftp_use_epsv = TRUE))  # Use passive mode for FTP
 
     # Perform the download and process the XML file
-    result_df = tryCatch({
+    result_df <- tryCatch({
         curl::curl_download(file_url, output_file, handle = h)
 
         # Check if the download was successful
         message("File downloaded successfully: ", output_file)
 
         # Process the downloaded XML file
-
-        if(isFALSE(raw)) {
-            if(data_type == 'MGP_Prezzi') {
+        if (isFALSE(raw)) {
+            if (data_type == 'MGP_Prezzi') {
                 result_df <- gme_dam_price_xml_to_data(output_file)
             }
-            # Remove the downloaded file after processing
-            file.remove(output_file)
-            return(result_df)
+            # Optionally remove the downloaded file after processing
         } else {
-            return(NULL)
+            result_df <- FALSE
         }
+
+        result_df
     }, error = function(e) {
         # Handle errors (e.g., failed download or XML processing)
         message("Error downloading file: ", filename, " - ", e$message)
-        return(NULL)  # Return NULL in case of an error
+        result_df = NULL
+        result_df
     })
+
+    if (is.null(result_df)) {
+        message("An error occurred; result_df is NULL.")
+    } else {
+        message("Processing completed successfully.")
+    }
+
     if(isFALSE(raw)) {
+        file.remove(output_file)
         return(result_df)
     } else {
         message(paste("XML File at:", output_file))
+        return(TRUE)
     }
 }
 
