@@ -1,4 +1,7 @@
-#' Retrieve Files from GME FTP Server
+
+# MGP ------------------------------------------------------------------------------------------------------
+
+#' Retrieve Files from GME FTP Server for DAM market
 #'
 #' This function connects to the GME FTP server to list XML files available in a specified directory.
 #' It can filter files based on the provided `data_type`.
@@ -659,6 +662,694 @@ gme_dam_limtran_xml_to_data <- function(xml_file_path) {
     melted_data[, VALUE := as.numeric(gsub(",", ".", VALUE))]
     melted_data[, VARIABLE := as.character(VARIABLE)]
     melted_data[, UNIT := 'MW']
+
+    return(melted_data)
+}
+
+
+
+# OTHER MARKETS ------------------------------------------------------------------------------------------------------
+
+## MSD ------------------------------------------------------------------------------------------------------
+
+
+
+#' Retrieve Files from GME FTP Server for Other markets
+#'
+#' This function connects to the GME FTP server to list XML files available in a specified directory.
+#' It can filter files based on the provided `data_type`.
+#'
+#' @param data_type A string specifying the data type directory to query.
+#'        Default is "MGP_Prezzi". Can be customized for other directories.
+#' @param output_dir A string specifying the directory where output files will be saved.
+#'        Default is "data". If the directory does not exist, it will be created.
+#' @param username FTP server username. Default is "PIASARACENO".
+#' @param password FTP server password. Default is "18N15C9R".
+#' @param verbose Logical. If TRUE, prints the list of available files. Default is FALSE.
+#'
+#' @return A character vector containing the filenames that match the specified pattern,
+#'         or NULL if an error occurs.
+#' @examples
+#' \dontrun{
+#' files <- gme_mgp_get_files(data_type = "MGP_Prezzi", verbose = TRUE)
+#' }
+#' @export
+gme_rest_get_files <- function(data_type, output_dir = "data",
+                              username = "PIASARACENO", password = "18N15C9R",
+                              verbose = FALSE) {
+
+    url_base = paste0('ftp://download.mercatoelettrico.org/MercatiElettrici/', data_type, '/')
+
+    if (data_type == "MSD_ServiziDispacciamento") {file_pattern = "\\S+MSDServiziDispacciamento\\.xml$"}
+    if (data_type == "MB_PRiservaSecondaria") {file_pattern = "\\S+MBPRiservaSecondaria\\.xml$"}
+    if (data_type == "MB_PAltriServizi") {file_pattern = "\\S+MBPAltriServizi\\.xml$"}
+    if (data_type == "MB_PTotali") {file_pattern = "\\S+MBPTotali\\.xml$"}
+    if (data_type == "XBID_EsitiTotali") {file_pattern = "\\S+XBIDEsitiTotali\\.xml$"}
+
+    # Ensure output directory exists
+    if (!dir.exists(output_dir)) {
+        dir.create(output_dir, recursive = TRUE)
+    }
+
+    # List files on the FTP server
+    tryCatch({
+        ftp_list_cmd <- paste0("curl -u ", username, ":", password, " ", url_base)
+        file_list <- system(ftp_list_cmd, intern = TRUE)
+        matches <- regexpr(file_pattern, file_list)
+        files <- regmatches(file_list, matches)
+        files <- files[nzchar(files)]
+
+        # Print available files
+        if(isTRUE(verbose)) {
+            message("Available files:")
+            print(files)
+        }
+        message("[OK] Available files download.")
+        return(files)
+    }, error = function(e) {
+        message("[ERROR] Error downloading filenames from GME directory", e$message)
+        return(NULL)
+    })
+    return(files)
+}
+
+
+
+#' Download and Process Other Markets Data File
+#'
+#' This function downloads a file from an FTP server using provided credentials, processes the
+#' XML data from the downloaded file, and returns the processed data. After processing, the
+#' downloaded XML file is deleted.
+#'
+#' @param filename A character string representing the name of the file to be downloaded.
+#' @param username A character string representing the FTP username for authentication.
+#' @param password A character string representing the FTP password for authentication.
+#' @param output_dir A character string representing the directory where the downloaded file will be saved.
+#'
+#' @return A data frame (or `NULL` in case of an error). The data frame contains the processed data
+#'         obtained from the downloaded XML file, or `NULL` if an error occurred during download or processing.
+#'
+#' @details
+#' This function uses the `curl` package to download the file from an FTP server with the provided
+#' credentials. After downloading, it passes the downloaded file to the `gme_dam_xml_to_data` function
+#' for processing. Finally, the downloaded XML file is deleted from the local system to clean up.
+#'
+#' @examples
+#' # Example usage:
+#' result <- gmeother_download_file("example.xml", "your_username", "your_password", "/path/to/output_dir")
+#' print(result)
+#'
+#' @import curl
+#' @import data.table
+#' @importFrom xml2 read_xml xml_find_all xml_text
+#' @export
+gme_other_download_file <- function(filename, data_type = 'MSD_ServiziDispacciamento', output_dir, username, password, raw = FALSE) {
+    # Construct the file URL
+
+    url_base = paste0('ftp://download.mercatoelettrico.org/MercatiElettrici/', data_type, '/')
+    file_url <- paste0(url_base, filename)
+
+    # Construct the output file path
+    output_file <- file.path(output_dir, filename)
+
+    # Create a curl handle
+    h <- curl::new_handle()
+    curl::handle_setopt(h,
+                        .list = list(
+                            userpwd = paste0(username, ":", password),
+                            ftp_use_epsv = TRUE))  # Use passive mode for FTP
+
+    # Perform the download and process the XML file
+    result_df <- tryCatch({
+        curl::curl_download(file_url, output_file, handle = h)
+
+        # Check if the download was successful
+        message("File downloaded successfully: ", output_file)
+
+
+        # Process the downloaded XML file
+        if (isFALSE(raw)) {
+            if (data_type == 'MSD_ServiziDispacciamento') {
+                result_df <- gme_msd_all_xml_to_data(output_file)
+                setcolorder(result_df, c('DATE', 'HOUR', 'MARKET', 'ZONE', 'VARIABLE', 'VALUE', 'UNIT'))
+            }
+            if (data_type == 'MB_PRiservaSecondaria') {
+                result_df <- gme_mb_rs_xml_to_data(output_file)
+                setcolorder(result_df, c('DATE', 'HOUR', 'MARKET', 'ZONE', 'VARIABLE', 'FIELD', 'VALUE', 'UNIT'))
+            }
+            if (data_type == 'MB_PAltriServizi') {
+                result_df <- gme_mb_as_xml_to_data(output_file)
+                setcolorder(result_df, c('DATE', 'HOUR', 'MARKET', 'ZONE', 'VARIABLE', 'FIELD', 'VALUE', 'UNIT'))
+            }
+            if (data_type == 'MB_PTotali') {
+                result_df <- gme_mb_tl_xml_to_data(output_file)
+                setcolorder(result_df, c('DATE', 'HOUR', 'MARKET', 'ZONE', 'VARIABLE', 'FIELD', 'VALUE', 'UNIT'))
+            }
+            if (data_type == 'XBID_EsitiTotali') {
+                result_df <- gme_xbid_all_xml_to_data(output_file)
+                setcolorder(result_df, c('DATE', 'HOUR', 'MARKET', 'ZONE', 'VARIABLE', 'VALUE', 'UNIT'))
+            }
+            # Optionally remove the downloaded file after processing
+        } else {
+            result_df <- FALSE
+        }
+
+        result_df
+    }, error = function(e) {
+        # Handle errors (e.g., failed download or XML processing)
+        message("Error downloading file: ", filename, " - ", e$message)
+        result_df = NULL
+        result_df
+    })
+
+    if (is.null(result_df)) {
+        message("An error occurred; result_df is NULL.")
+    } else {
+        message("Processing completed successfully.")
+    }
+
+    if(isFALSE(raw)) {
+        file.remove(output_file)
+        return(result_df)
+    } else {
+        message(paste("XML File at:", output_file))
+        return(TRUE)
+    }
+}
+
+
+
+#' Process GME Other Markets MSD XML Data
+#'
+#' This function processes a GME Other Markets MSD XML file and extracts
+#' structured data, converting it into a tidy `data.table` format. It dynamically parses
+#' all quantity fields, standardizes their names, and reshapes the data into long format.
+#'
+#' @param xml_file_path A string specifying the file path to the XML file containing quantity data.
+#'
+#' @return A `data.table` in long format with the following columns:
+#' \itemize{
+#'   \item `DATE`: Date of the record (as a Date object).
+#'   \item `MARKET`: Market type, typically `MSD`.
+#'   \item `HOUR`: Hour of the record (integer).
+#'   \item `ZONE`: Zone or region (e.g., `CSUD`, `CALA`).
+#'   \item `VALUE`: Numeric value of the quantity in MWh.
+#'   \item `UNIT`: Unit of the value, default is `MWh`.
+#' }
+#'
+#' @details
+#' The function performs the following steps:
+#' \enumerate{
+#'   \item Reads the XML file and locates all `MSD` nodes.
+#'   \item Extracts key fields (`Data`, `Mercato`, `Ora`) and dynamically captures all quantity-related fields.
+#'   \item Converts commas in values to dots for numeric compatibility.
+#'   \item Creates a wide-format `data.table` with standardized column names.
+#'   \item Reshapes the data to a long format for better analysis and visualization.
+#' }
+#'
+#' @examples
+#' \dontrun{
+#' # Process an XML file
+#' file_path <- "path/to/MSD_ServiziDispacciamento.xml"
+#' transit_data <- gme_msd_all_xml_to_data(file_path)
+#' head(transit_data)
+#' }
+#'
+#' @import data.table
+#' @import xml2
+#' @export
+gme_msd_all_xml_to_data <- function(xml_file_path) {
+
+    # Read the XML file
+    xml_data <- read_xml(xml_file_path)
+
+    # Extract all "ServiziDispacciamento" nodes
+    sd_nodes <- xml_find_all(xml_data, ".//ServiziDispacciamento")
+
+    # Initialize an empty list to store intermediate data.tables
+    data_list <- lapply(sd_nodes, function(node) {
+        # Extract each child node within "ServiziDispacciamento"
+        child_nodes <- xml_children(node)
+
+        # Extract field names and values
+        field_names <- xml_name(child_nodes)
+        field_values <- xml_text(child_nodes)
+
+        # Replace commas with dots for numeric conversion and create a data.table
+        dt <- data.table::data.table(
+            FIELD = field_names,
+            VALUE = gsub(",", ".", field_values)
+        )
+        # Reshape to wide format
+        data.table::dcast(dt, . ~ FIELD, value.var = "VALUE")[, . := NULL] # Drop placeholder column '.'
+    })
+
+    # Combine all intermediate data.tables
+    combined_data <- rbindlist(data_list, fill = TRUE)
+
+    # Clean and type-convert fields where necessary
+    combined_data[, `:=`(
+        Data = as.Date(Data, format = "%Y%m%d"),
+        Ora = as.integer(Ora)
+    )]
+
+    # Tidy the data for analysis
+    melted_data <- melt(
+        combined_data,
+        id.vars = c("Data", "Ora", "Mercato"),
+        variable.name = "ZONE_VARIABLE",
+        variable.factor = FALSE,
+        value.name = "VALUE"
+    )
+
+    # Separate ZONE and VARIABLE
+    melted_data[, `:=`(
+        ZONE = ifelse(grepl("_", ZONE_VARIABLE), sub("_.*", "", ZONE_VARIABLE), "TOTAL"),
+        VARIABLE = ifelse(grepl("_", ZONE_VARIABLE), sub(".*_", "", ZONE_VARIABLE), ZONE_VARIABLE)
+    )]
+    # Assign units
+
+    melted_data[, UNIT := ifelse(grepl("MWh", VARIABLE), "MWh", "EUR")]
+    melted_data[, ZONE_VARIABLE := NULL]
+    setnames(melted_data, c('Data', 'Mercato', 'Ora'), c('DATE', 'MARKET', 'HOUR'))
+
+    return(melted_data)
+}
+
+
+#' Process GME Other Markets MB RS XML Data
+#'
+#' This function processes a GME Other Markets MB RS XML file and extracts
+#' structured data, converting it into a tidy `data.table` format. It dynamically parses
+#' all quantity fields, standardizes their names, and reshapes the data into long format.
+#'
+#' @param xml_file_path A string specifying the file path to the XML file containing quantity data.
+#'
+#' @return A `data.table` in long format with the following columns:
+#' \itemize{
+#'   \item `DATE`: Date of the record (as a Date object).
+#'   \item `MARKET`: Market type, typically `MB RS`.
+#'   \item `HOUR`: Hour of the record (integer).
+#'   \item `ZONE`: Zone or region (e.g., `CSUD`, `CALA`).
+#'   \item `VALUE`: Numeric value of the quantity in MWh.
+#'   \item `UNIT`: Unit of the value, default is `MWh`.
+#' }
+#'
+#' @details
+#' The function performs the following steps:
+#' \enumerate{
+#'   \item Reads the XML file and locates all `MB RS` nodes.
+#'   \item Extracts key fields (`Data`, `Mercato`, `Ora`) and dynamically captures all quantity-related fields.
+#'   \item Converts commas in values to dots for numeric compatibility.
+#'   \item Creates a wide-format `data.table` with standardized column names.
+#'   \item Reshapes the data to a long format for better analysis and visualization.
+#' }
+#'
+#' @examples
+#' \dontrun{
+#' # Process an XML file
+#' file_path <- "path/to/MB_PRiservaSecondaria.xml"
+#' transit_data <- gme_mb_rs_xml_to_data(file_path)
+#' head(transit_data)
+#' }
+#'
+#' @import data.table
+#' @import xml2
+#' @export
+gme_mb_rs_xml_to_data <- function(xml_file_path) {
+
+    # Read the XML file
+    xml_data <- read_xml(xml_file_path)
+
+    # Extract all "ServiziDispacciamento" nodes
+    sd_nodes <- xml_find_all(xml_data, ".//ServiziDispacciamento")
+
+    # Initialize an empty list to store intermediate data.tables
+    data_list <- lapply(sd_nodes, function(node) {
+        # Extract each child node within "ServiziDispacciamento"
+        child_nodes <- xml_children(node)
+
+        # Extract field names and values
+        field_names <- xml_name(child_nodes)
+        field_values <- xml_text(child_nodes)
+
+        # Replace commas with dots for numeric conversion and create a data.table
+        dt <- data.table::data.table(
+            FIELD = field_names,
+            VALUE = gsub(",", ".", field_values)
+        )
+        # Reshape to wide format
+        data.table::dcast(dt, . ~ FIELD, value.var = "VALUE")[, . := NULL] # Drop placeholder column '.'
+    })
+
+    # Combine all intermediate data.tables
+    combined_data <- rbindlist(data_list, fill = TRUE)
+
+    # Clean and type-convert fields where necessary
+    combined_data[, `:=`(
+        Data = as.Date(Data, format = "%Y%m%d"),
+        Ora = as.integer(Ora)
+    )]
+
+    # Tidy the data for analysis
+    melted_data <- melt(
+        combined_data,
+        id.vars = c("Data", "Ora", "Mercato"),
+        variable.name = "ZONE_VARIABLE",
+        variable.factor = FALSE,
+        value.name = "VALUE"
+    )
+
+    # Separate ZONE and VARIABLE
+    melted_data[, `:=`(
+        ZONE = ifelse(lengths(strsplit(ZONE_VARIABLE, "_")) == 1, "TOTAL", sapply(strsplit(ZONE_VARIABLE, "_"), `[`, 1)),  # First element or "TOTAL"
+        VARIABLE = ifelse(lengths(strsplit(ZONE_VARIABLE, "_")) == 1, ZONE_VARIABLE,
+                          ifelse(lengths(strsplit(ZONE_VARIABLE, "_")) >= 2, sapply(strsplit(ZONE_VARIABLE, "_"), `[`, 2), NA)),  # Second element or entire value if length is 1
+        FIELD = ifelse(lengths(strsplit(ZONE_VARIABLE, "_")) == 3, sapply(strsplit(ZONE_VARIABLE, "_"), `[`, 3), NA)  # Third element or NA
+    )]
+    # Assign units
+
+    melted_data[, UNIT := ifelse(grepl("MWh", VARIABLE), "MWh", "EUR")]
+    melted_data[, ZONE_VARIABLE := NULL]
+    setnames(melted_data, c('Data', 'Mercato', 'Ora'), c('DATE', 'MARKET', 'HOUR'))
+    melted_data[, MARKET := 'MB Riserva Secondaria']
+
+    return(melted_data)
+}
+
+
+#' Process GME Other Markets MS AS XML Data
+#'
+#' This function processes a GME Other Markets MS AS XML file and extracts
+#' structured data, converting it into a tidy `data.table` format. It dynamically parses
+#' all quantity fields, standardizes their names, and reshapes the data into long format.
+#'
+#' @param xml_file_path A string specifying the file path to the XML file containing quantity data.
+#'
+#' @return A `data.table` in long format with the following columns:
+#' \itemize{
+#'   \item `DATE`: Date of the record (as a Date object).
+#'   \item `MARKET`: Market type, typically `MS AS`.
+#'   \item `HOUR`: Hour of the record (integer).
+#'   \item `ZONE`: Zone or region (e.g., `CSUD`, `CALA`).
+#'   \item `VALUE`: Numeric value of the quantity in MWh.
+#'   \item `UNIT`: Unit of the value, default is `MWh`.
+#' }
+#'
+#' @details
+#' The function performs the following steps:
+#' \enumerate{
+#'   \item Reads the XML file and locates all `MS AS` nodes.
+#'   \item Extracts key fields (`Data`, `Mercato`, `Ora`) and dynamically captures all quantity-related fields.
+#'   \item Converts commas in values to dots for numeric compatibility.
+#'   \item Creates a wide-format `data.table` with standardized column names.
+#'   \item Reshapes the data to a long format for better analysis and visualization.
+#' }
+#'
+#' @examples
+#' \dontrun{
+#' # Process an XML file
+#' file_path <- "path/to/MB_PRiservaSecondaria.xml"
+#' transit_data <- gme_mb_rs_xml_to_data(file_path)
+#' head(transit_data)
+#' }
+#'
+#' @import data.table
+#' @import xml2
+#' @export
+gme_mb_as_xml_to_data <- function(xml_file_path) {
+
+    # Read the XML file
+    xml_data <- read_xml(xml_file_path)
+
+    # Extract all "ServiziDispacciamento" nodes
+    sd_nodes <- xml_find_all(xml_data, ".//ServiziDispacciamento")
+
+    # Initialize an empty list to store intermediate data.tables
+    data_list <- lapply(sd_nodes, function(node) {
+        # Extract each child node within "ServiziDispacciamento"
+        child_nodes <- xml_children(node)
+
+        # Extract field names and values
+        field_names <- xml_name(child_nodes)
+        field_values <- xml_text(child_nodes)
+
+        # Replace commas with dots for numeric conversion and create a data.table
+        dt <- data.table::data.table(
+            FIELD = field_names,
+            VALUE = gsub(",", ".", field_values)
+        )
+        # Reshape to wide format
+        data.table::dcast(dt, . ~ FIELD, value.var = "VALUE")[, . := NULL] # Drop placeholder column '.'
+    })
+
+    # Combine all intermediate data.tables
+    combined_data <- rbindlist(data_list, fill = TRUE)
+
+    # Clean and type-convert fields where necessary
+    combined_data[, `:=`(
+        Data = as.Date(Data, format = "%Y%m%d"),
+        Ora = as.integer(Ora)
+    )]
+
+    # Tidy the data for analysis
+    melted_data <- melt(
+        combined_data,
+        id.vars = c("Data", "Ora", "Mercato"),
+        variable.name = "ZONE_VARIABLE",
+        variable.factor = FALSE,
+        value.name = "VALUE"
+    )
+
+    # Separate ZONE and VARIABLE
+    melted_data[, `:=`(
+        ZONE = ifelse(lengths(strsplit(ZONE_VARIABLE, "_")) == 1, "TOTAL", sapply(strsplit(ZONE_VARIABLE, "_"), `[`, 1)),  # First element or "TOTAL"
+        VARIABLE = ifelse(lengths(strsplit(ZONE_VARIABLE, "_")) == 1, ZONE_VARIABLE,
+                          ifelse(lengths(strsplit(ZONE_VARIABLE, "_")) >= 2, sapply(strsplit(ZONE_VARIABLE, "_"), `[`, 2), NA)),  # Second element or entire value if length is 1
+        FIELD = ifelse(lengths(strsplit(ZONE_VARIABLE, "_")) == 3, sapply(strsplit(ZONE_VARIABLE, "_"), `[`, 3), NA)  # Third element or NA
+    )]
+    # Assign units
+
+    melted_data[, UNIT := ifelse(grepl("MWh", VARIABLE), "MWh", "EUR")]
+    melted_data[, ZONE_VARIABLE := NULL]
+    setnames(melted_data, c('Data', 'Mercato', 'Ora'), c('DATE', 'MARKET', 'HOUR'))
+    melted_data[, MARKET := 'MB Altri Servizi']
+
+    return(melted_data)
+}
+
+
+#' Process GME Other Markets MB Totali XML Data
+#'
+#' This function processes a GME Other Markets MB Totali XML file and extracts
+#' structured data, converting it into a tidy `data.table` format. It dynamically parses
+#' all quantity fields, standardizes their names, and reshapes the data into long format.
+#'
+#' @param xml_file_path A string specifying the file path to the XML file containing quantity data.
+#'
+#' @return A `data.table` in long format with the following columns:
+#' \itemize{
+#'   \item `DATE`: Date of the record (as a Date object).
+#'   \item `MARKET`: Market type, typically `MB Totali`.
+#'   \item `HOUR`: Hour of the record (integer).
+#'   \item `ZONE`: Zone or region (e.g., `CSUD`, `CALA`).
+#'   \item `VALUE`: Numeric value of the quantity in MWh.
+#'   \item `UNIT`: Unit of the value, default is `MWh`.
+#' }
+#'
+#' @details
+#' The function performs the following steps:
+#' \enumerate{
+#'   \item Reads the XML file and locates all `MSD` nodes.
+#'   \item Extracts key fields (`Data`, `Mercato`, `Ora`) and dynamically captures all quantity-related fields.
+#'   \item Converts commas in values to dots for numeric compatibility.
+#'   \item Creates a wide-format `data.table` with standardized column names.
+#'   \item Reshapes the data to a long format for better analysis and visualization.
+#' }
+#'
+#' @examples
+#' \dontrun{
+#' # Process an XML file
+#' file_path <- "path/to/MBPTotali.xml"
+#' transit_data <- gme_mb_tl_xml_to_data(file_path)
+#' head(transit_data)
+#' }
+#'
+#' @import data.table
+#' @import xml2
+#' @export
+gme_mb_tl_xml_to_data <- function(xml_file_path) {
+
+    # Read the XML file
+    xml_data <- read_xml(xml_file_path)
+
+    # Extract all "ServiziDispacciamento" nodes
+    sd_nodes <- xml_find_all(xml_data, ".//ServiziDispacciamento")
+
+    # Initialize an empty list to store intermediate data.tables
+    data_list <- lapply(sd_nodes, function(node) {
+        # Extract each child node within "ServiziDispacciamento"
+        child_nodes <- xml_children(node)
+
+        # Extract field names and values
+        field_names <- xml_name(child_nodes)
+        field_values <- xml_text(child_nodes)
+
+        # Replace commas with dots for numeric conversion and create a data.table
+        dt <- data.table::data.table(
+            FIELD = field_names,
+            VALUE = gsub(",", ".", field_values)
+        )
+        # Reshape to wide format
+        data.table::dcast(dt, . ~ FIELD, value.var = "VALUE")[, . := NULL] # Drop placeholder column '.'
+    })
+
+    # Combine all intermediate data.tables
+    combined_data <- rbindlist(data_list, fill = TRUE)
+
+    # Clean and type-convert fields where necessary
+    combined_data[, `:=`(
+        Data = as.Date(Data, format = "%Y%m%d"),
+        Ora = as.integer(Ora)
+    )]
+
+    # Tidy the data for analysis
+    melted_data <- melt(
+        combined_data,
+        id.vars = c("Data", "Ora", "Mercato"),
+        variable.name = "ZONE_VARIABLE",
+        variable.factor = FALSE,
+        value.name = "VALUE"
+    )
+
+    # Separate ZONE and VARIABLE
+    melted_data[, `:=`(
+        ZONE = ifelse(lengths(strsplit(ZONE_VARIABLE, "_")) == 1, "TOTAL", sapply(strsplit(ZONE_VARIABLE, "_"), `[`, 1)),  # First element or "TOTAL"
+        VARIABLE = ifelse(lengths(strsplit(ZONE_VARIABLE, "_")) == 1, ZONE_VARIABLE,
+                          ifelse(lengths(strsplit(ZONE_VARIABLE, "_")) >= 2, sapply(strsplit(ZONE_VARIABLE, "_"), `[`, 2), NA)),  # Second element or entire value if length is 1
+        FIELD = ifelse(lengths(strsplit(ZONE_VARIABLE, "_")) == 3, sapply(strsplit(ZONE_VARIABLE, "_"), `[`, 3), NA)  # Third element or NA
+    )]
+    # Assign units
+
+    melted_data[, UNIT := ifelse(grepl("MWh", VARIABLE), "MWh", "EUR")]
+    melted_data[, ZONE_VARIABLE := NULL]
+    setnames(melted_data, c('Data', 'Mercato', 'Ora'), c('DATE', 'MARKET', 'HOUR'))
+    melted_data[, MARKET := 'MB Totali']
+
+    return(melted_data)
+}
+
+
+
+#' Process GME Other Markets XBID XML Data
+#'
+#' This function processes a GME Other Markets MSD XML file and extracts
+#' structured data, converting it into a tidy `data.table` format. It dynamically parses
+#' all quantity fields, standardizes their names, and reshapes the data into long format.
+#'
+#' @param xml_file_path A string specifying the file path to the XML file containing quantity data.
+#'
+#' @return A `data.table` in long format with the following columns:
+#' \itemize{
+#'   \item `DATE`: Date of the record (as a Date object).
+#'   \item `MARKET`: Market type, typically `XBID`.
+#'   \item `HOUR`: Hour of the record (integer).
+#'   \item `ZONE`: Zone or region (e.g., `CSUD`, `CALA`).
+#'   \item `VALUE`: Numeric value of the quantity in MWh.
+#'   \item `UNIT`: Unit of the value, default is `MWh`.
+#' }
+#'
+#' @details
+#' The function performs the following steps:
+#' \enumerate{
+#'   \item Reads the XML file and locates all `XBID` nodes.
+#'   \item Extracts key fields (`Data`, `Mercato`, `Ora`) and dynamically captures all quantity-related fields.
+#'   \item Converts commas in values to dots for numeric compatibility.
+#'   \item Creates a wide-format `data.table` with standardized column names.
+#'   \item Reshapes the data to a long format for better analysis and visualization.
+#' }
+#'
+#' @examples
+#' \dontrun{
+#' # Process an XML file
+#' file_path <- "path/to/XBID.XML"
+#' transit_data <- gme_xbid_all_xml_to_data(file_path)
+#' head(transit_data)
+#' }
+#'
+#' @import data.table
+#' @import xml2
+#' @export
+gme_xbid_all_xml_to_data <- function(xml_file_path) {
+
+    # Read the XML file
+    xml_data <- read_xml(xml_file_path)
+
+    # Extract all "Table" nodes
+    table_nodes <- xml_find_all(xml_data, ".//Table")
+
+    # Initialize an empty list to store intermediate data.tables
+    data_list <- lapply(table_nodes, function(node) {
+        # Extract each element within the "Table" node
+        flow_date <- xml_text(xml_find_first(node, ".//FlowDate"))
+        hour <- xml_text(xml_find_first(node, ".//Hour"))
+        zone <- xml_text(xml_find_first(node, ".//Zone"))
+        first <- xml_text(xml_find_first(node, ".//First"))
+        last <- xml_text(xml_find_first(node, ".//Last"))
+        min_value <- xml_text(xml_find_first(node, ".//Min"))
+        max_value <- xml_text(xml_find_first(node, ".//Max"))
+        riferimento <- xml_text(xml_find_first(node, ".//Riferimento"))
+        last_hour <- xml_text(xml_find_first(node, ".//LastHour"))
+        acquisti <- xml_text(xml_find_first(node, ".//Acquisti"))
+        vendite <- xml_text(xml_find_first(node, ".//Vendite"))
+
+        # Create a data.table for this entry
+        dt <- data.table::data.table(
+            DATE = flow_date,
+            HOUR = hour,
+            ZONE = zone,
+            First = first,
+            Last = last,
+            Min = min_value,
+            Max = max_value,
+            Riferimento = riferimento,
+            LastHour = last_hour,
+            Acquisti = acquisti,
+            Vendite = vendite
+        )
+
+        return(dt)
+    })
+
+    # Combine all intermediate data.tables
+    combined_data <- rbindlist(data_list, fill = TRUE)
+
+    # Clean and type-convert fields where necessary
+    combined_data[, `:=`(
+        DATE = as.Date(DATE, format = "%Y%m%d"),
+        HOUR = as.integer(HOUR),
+        First = as.numeric(First),
+        Last = as.numeric(Last),
+        Min = as.numeric(Min),
+        Max = as.numeric(Max),
+        Riferimento = as.numeric(Riferimento),
+        LastHour = as.numeric(LastHour),
+        Acquisti = as.numeric(Acquisti),
+        Vendite = as.numeric(Vendite)
+    )]
+
+    # Melt the data for analysis (long format)
+    melted_data <- melt(
+        combined_data,
+        id.vars = c("DATE", "HOUR", "ZONE"),
+        variable.name = "VARIABLE",
+        variable.factor = FALSE,
+        value.name = "VALUE"
+    )
+
+    # Assign units based on the VARIABLE (for example, "MWh" or "EUR")
+    melted_data[, UNIT := ifelse(grepl("MWh", VARIABLE), "MWh", "EUR")]
+    melted_data[, MARKET := 'XBID']
 
     return(melted_data)
 }

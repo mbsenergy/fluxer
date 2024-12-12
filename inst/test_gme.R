@@ -375,3 +375,313 @@ print(dt_mgp_limtran)
 #         return(NULL)
 #     })
 # })
+
+
+
+# MSD -----------------
+
+## 7.1 Parameters ------------
+n <- 5
+
+data_type <- 'MSD_ServiziDispacciamento'
+username <- "PIASARACENO"
+password <- "18N15C9R"
+output_dir = "data"
+
+
+## 7.2 Get files available at GME folder ------------
+msd_all_files = gme_rest_get_files(data_type = data_type, output_dir = output_dir, username = username, password = password)
+
+last_n_files <- tail(msd_all_files, n)
+print(last_n_files)
+
+## 7.3 Download DATASET CLEAN------------
+
+list_msd_all <- lapply(last_n_files, function(file) {
+    tryCatch({
+        # Call mgp_download_file with explicit arguments
+        gme_other_download_file(
+            filename = file,
+            data_type = data_type,
+            output_dir = output_dir,
+            username = username,       # FTP username for authentication
+            password = password,       # FTP password for authentication
+            raw = FALSE
+        )
+    }, error = function(e) {
+        # In case of an error (e.g., failed download or processing), return NULL
+        message("Error processing file: ", file, " - ", e$message)
+        return(NULL)
+    })
+})
+
+dt_msd_all = rbindlist(list_msd_all)
+print(dt_msd_all)
+
+## 7.4 Download RAW DATA------------
+
+# lapply(last_n_files, function(file) {
+#     tryCatch({
+#         # Call mgp_download_file with explicit arguments
+#         gme_other_download_file(
+#             filename = file,
+#             data_type = data_type,
+#             output_dir = output_dir,
+#             username = username,       # FTP username for authentication
+#             password = password,       # FTP password for authentication
+#             raw = TRUE
+#         )
+#     }, error = function(e) {
+#         # In case of an error (e.g., failed download or processing), return NULL
+#         message("Error processing file: ", file, " - ", e$message)
+#         return(NULL)
+#     })
+# })
+
+
+
+# MB RS -----------------
+
+## 8.1 Parameters ------------
+n <- 5
+
+data_type <- 'MB_PRiservaSecondaria'
+username <- "PIASARACENO"
+password <- "18N15C9R"
+output_dir = "data"
+
+
+## 8.2 Get files available at GME folder ------------
+mb_rs_files = gme_rest_get_files(data_type = data_type, output_dir = output_dir, username = username, password = password)
+
+last_n_files <- tail(mb_rs_files, n)
+print(last_n_files)
+
+## 8.3 Download DATASET CLEAN------------
+
+list_mb_rs <- lapply(last_n_files, function(file) {
+    tryCatch({
+        # Call mgp_download_file with explicit arguments
+        gme_other_download_file(
+            filename = file,
+            data_type = data_type,
+            output_dir = output_dir,
+            username = username,       # FTP username for authentication
+            password = password,       # FTP password for authentication
+            raw = FALSE
+        )
+    }, error = function(e) {
+        # In case of an error (e.g., failed download or processing), return NULL
+        message("Error processing file: ", file, " - ", e$message)
+        return(NULL)
+    })
+})
+
+dt_mb_rs = rbindlist(list_mb_rs)
+print(dt_mb_rs)
+
+## 8.4 Download RAW DATA------------
+
+# lapply(last_n_files, function(file) {
+#     tryCatch({
+#         # Call mgp_download_file with explicit arguments
+#         gme_other_download_file(
+#             filename = file,
+#             data_type = data_type,
+#             output_dir = output_dir,
+#             username = username,       # FTP username for authentication
+#             password = password,       # FTP password for authentication
+#             raw = TRUE
+#         )
+#     }, error = function(e) {
+#         # In case of an error (e.g., failed download or processing), return NULL
+#         message("Error processing file: ", file, " - ", e$message)
+#         return(NULL)
+#     })
+# })
+
+
+# MB AS -----------------
+
+## 9.1 Parameters ------------
+n <- 5
+
+data_type <- 'MB_PAltriServizi'
+username <- "PIASARACENO"
+password <- "18N15C9R"
+output_dir = "data"
+
+
+## 9.2 Get files available at GME folder ------------
+mb_as_files = gme_rest_get_files(data_type = data_type, output_dir = output_dir, username = username, password = password)
+
+last_n_files <- tail(mb_as_files, n)
+print(last_n_files)
+
+## 9.3 Download DATASET CLEAN------------
+
+list_mb_as <- lapply(last_n_files, function(file) {
+    tryCatch({
+        # Call mgp_download_file with explicit arguments
+        gme_other_download_file(
+            filename = file,
+            data_type = data_type,
+            output_dir = output_dir,
+            username = username,       # FTP username for authentication
+            password = password,       # FTP password for authentication
+            raw = FALSE
+        )
+    }, error = function(e) {
+        # In case of an error (e.g., failed download or processing), return NULL
+        message("Error processing file: ", file, " - ", e$message)
+        return(NULL)
+    })
+})
+
+dt_mb_as = rbindlist(list_mb_as)
+print(dt_mb_as)
+
+## 9.4 Download RAW DATA------------
+
+# lapply(last_n_files, function(file) {
+#     tryCatch({
+#         # Call mgp_download_file with explicit arguments
+#         gme_other_download_file(
+#             filename = file,
+#             data_type = data_type,
+#             output_dir = output_dir,
+#             username = username,       # FTP username for authentication
+#             password = password,       # FTP password for authentication
+#             raw = TRUE
+#         )
+#     }, error = function(e) {
+#         # In case of an error (e.g., failed download or processing), return NULL
+#         message("Error processing file: ", file, " - ", e$message)
+#         return(NULL)
+#     })
+# })
+
+
+# MB TOTALI -----------------
+
+## 10.1 Parameters ------------
+n <- 5
+
+data_type <- 'MB_PTotali'
+username <- "PIASARACENO"
+password <- "18N15C9R"
+output_dir = "data"
+
+
+## 10.2 Get files available at GME folder ------------
+mb_tl_files = gme_rest_get_files(data_type = data_type, output_dir = output_dir, username = username, password = password)
+
+last_n_files <- tail(mb_tl_files, n)
+print(last_n_files)
+
+## 10.3 Download DATASET CLEAN------------
+
+list_mb_tl <- lapply(last_n_files, function(file) {
+    tryCatch({
+        # Call mgp_download_file with explicit arguments
+        gme_other_download_file(
+            filename = file,
+            data_type = data_type,
+            output_dir = output_dir,
+            username = username,       # FTP username for authentication
+            password = password,       # FTP password for authentication
+            raw = FALSE
+        )
+    }, error = function(e) {
+        # In case of an error (e.g., failed download or processing), return NULL
+        message("Error processing file: ", file, " - ", e$message)
+        return(NULL)
+    })
+})
+
+dt_mb_tl = rbindlist(list_mb_tl)
+print(dt_mb_tl)
+
+## 10.4 Download RAW DATA------------
+
+# lapply(last_n_files, function(file) {
+#     tryCatch({
+#         # Call mgp_download_file with explicit arguments
+#         gme_other_download_file(
+#             filename = file,
+#             data_type = data_type,
+#             output_dir = output_dir,
+#             username = username,       # FTP username for authentication
+#             password = password,       # FTP password for authentication
+#             raw = TRUE
+#         )
+#     }, error = function(e) {
+#         # In case of an error (e.g., failed download or processing), return NULL
+#         message("Error processing file: ", file, " - ", e$message)
+#         return(NULL)
+#     })
+# })
+
+
+
+# XBID -----------------
+
+## 11.1 Parameters ------------
+n <- 5
+
+data_type <- 'XBID_EsitiTotali'
+username <- "PIASARACENO"
+password <- "18N15C9R"
+output_dir = "data"
+
+
+## 11.2 Get files available at GME folder ------------
+xbid_all_files = gme_rest_get_files(data_type = data_type, output_dir = output_dir, username = username, password = password)
+
+last_n_files <- tail(xbid_all_files, n)
+print(last_n_files)
+
+## 11.3 Download DATASET CLEAN------------
+
+list_xbid_all <- lapply(last_n_files, function(file) {
+    tryCatch({
+        # Call mgp_download_file with explicit arguments
+        gme_other_download_file(
+            filename = file,
+            data_type = data_type,
+            output_dir = output_dir,
+            username = username,       # FTP username for authentication
+            password = password,       # FTP password for authentication
+            raw = FALSE
+        )
+    }, error = function(e) {
+        # In case of an error (e.g., failed download or processing), return NULL
+        message("Error processing file: ", file, " - ", e$message)
+        return(NULL)
+    })
+})
+
+dt_xbid_all = rbindlist(list_xbid_all)
+print(dt_xbid_all)
+
+## 11.4 Download RAW DATA------------
+
+# lapply(last_n_files, function(file) {
+#     tryCatch({
+#         # Call mgp_download_file with explicit arguments
+#         gme_other_download_file(
+#             filename = file,
+#             data_type = data_type,
+#             output_dir = output_dir,
+#             username = username,       # FTP username for authentication
+#             password = password,       # FTP password for authentication
+#             raw = TRUE
+#         )
+#     }, error = function(e) {
+#         # In case of an error (e.g., failed download or processing), return NULL
+#         message("Error processing file: ", file, " - ", e$message)
+#         return(NULL)
+#     })
+# })
+
+
