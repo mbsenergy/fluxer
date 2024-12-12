@@ -14,6 +14,9 @@ to_data <- Sys.Date()
 dam_prices <- entsoe_dam_prices(country, from_data, to_data, api_key = Sys.getenv('ENTSOE_KEY'))
 dam_prices %>% head()
 
+# con_df = parse_ftp_links(con)
+# con_df
+
 # OK
 
 

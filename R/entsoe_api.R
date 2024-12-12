@@ -74,11 +74,11 @@ entsoe_dam_prices = function(country, from_data, to_data, api_key = Sys.getenv('
 
   # Process the extracted data and format it
   DT = result[, .(CODE_ENTSOE = country, DATE = format(suppressWarnings(strptime(StartTime, "%Y-%m-%dT%H:%MZ")), "%Y-%m-%d"),
-                  HOUR = Position, VALUE = Price, UNIT = 'EUR')]
+                  HOUR = Position, RESOLUTION = Resolution, VALUE = Price, UNIT = 'EUR')]
 
   DT = merge(DT, entsoe_countries[, .(COUNTRY, CODE_ENTSOE)], by = 'CODE_ENTSOE', all.x = TRUE)
 
-  setcolorder(DT, neworder = c('COUNTRY', 'CODE_ENTSOE', 'DATE', 'HOUR', 'VALUE', 'UNIT'))
+  setcolorder(DT, neworder = c('COUNTRY', 'CODE_ENTSOE', 'DATE', 'HOUR', 'RESOLUTION', 'VALUE', 'UNIT'))
 
   # Display a success message with formatting using glue and crayon
   message <- glue("[{crayon::bold('OK')}] DATA for {crayon::bold(country)} from {crayon::bold(from_data)} to {crayon::bold(to_data)} retrieved correctly")
