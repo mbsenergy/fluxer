@@ -26,6 +26,10 @@ gme_mgp_get_files <- function(data_type, output_dir = "data",
 
     if (data_type == "MGP_Prezzi") {file_pattern = "\\S+MGPPrezzi\\.xml$"}
     if (data_type == "MGP_Quantita") {file_pattern = "\\S+MGPQuantita\\.xml$"}
+    if (data_type == "MGP_Fabbisogno") {file_pattern = "\\S+MGPFabbisogno\\.xml$"}
+    if (data_type == "MGP_Liquidita") {file_pattern = "\\S+MGPLiquidita\\.xml$"}
+    if (data_type == "MGP_Transiti") {file_pattern = "\\S+MGPTransiti\\.xml$"}
+    if (data_type == "MGP_LimitiTransito") {file_pattern = "\\S+MGPLimitiTransito\\.xml$"}
 
     # Ensure output directory exists
     if (!dir.exists(output_dir)) {
@@ -117,7 +121,22 @@ mgp_download_file <- function(filename, data_type = 'MGP_Prezzi', output_dir, us
                 result_df <- gme_dam_quantity_xml_to_data(output_file)
                 setcolorder(result_df, c('DATE', 'HOUR', 'MARKET', 'ZONE', 'VALUE', 'UNIT'))
             }
-
+            if (data_type == 'MGP_Fabbisogno') {
+                result_df <- gme_dam_fabb_xml_to_data(output_file)
+                setcolorder(result_df, c('DATE', 'HOUR', 'MARKET', 'ZONE', 'VALUE', 'UNIT'))
+            }
+            if (data_type == 'MGP_Liquidita') {
+                result_df <- gme_dam_liq_xml_to_data(output_file)
+                setcolorder(result_df, c('DATE', 'HOUR', 'MARKET', 'ZONE', 'VALUE', 'UNIT'))
+            }
+            if (data_type == 'MGP_Transiti') {
+                result_df <- gme_dam_tran_xml_to_data(output_file)
+                setcolorder(result_df, c('DATE', 'HOUR', 'MARKET', 'ZONE', 'VALUE', 'UNIT'))
+            }
+            if (data_type == 'MGP_LimitiTransito') {
+                result_df <- gme_dam_limtran_xml_to_data(output_file)
+                setcolorder(result_df, c('DATE', 'HOUR', 'MARKET', 'ZONE', 'VARIABLE', 'VALUE', 'UNIT'))
+            }
             # Optionally remove the downloaded file after processing
         } else {
             result_df <- FALSE
@@ -255,7 +274,7 @@ gme_dam_price_xml_to_data <- function(xml_file_path) {
 #' @details
 #' The function performs the following steps:
 #' \enumerate{
-#'   \item Reads the XML file and locates all `Quantita` nodes.
+#'   \item Reads the XML file and locates all `Liquidita` nodes.
 #'   \item Extracts key fields (`Data`, `Mercato`, `Ora`) and dynamically captures all quantity-related fields.
 #'   \item Converts commas in values to dots for numeric compatibility.
 #'   \item Creates a wide-format `data.table` with standardized column names.
@@ -332,3 +351,314 @@ gme_dam_quantity_xml_to_data <- function(xml_file_path) {
     return(data_dt_long)
 }
 
+
+
+#' Process GME DAM Fabbisogno XML Data
+#'
+#' This function processes a GME Day-Ahead Market (DAM) fabissogno XML file and extracts
+#' structured data, converting it into a tidy `data.table` format. It dynamically parses
+#' all quantity fields, standardizes their names, and reshapes the data into long format.
+#'
+#' @param xml_file_path A string specifying the file path to the XML file containing quantity data.
+#'
+#' @return A `data.table` in long format with the following columns:
+#' \itemize{
+#'   \item `DATE`: Date of the record (as a Date object).
+#'   \item `MARKET`: Market type, typically `MGP`.
+#'   \item `HOUR`: Hour of the record (integer).
+#'   \item `ZONE`: Zone or region (e.g., `CSUD`, `CALA`).
+#'   \item `VALUE`: Numeric value of the quantity in MWh.
+#'   \item `UNIT`: Unit of the value, default is `MWh`.
+#' }
+#'
+#' @details
+#' The function performs the following steps:
+#' \enumerate{
+#'   \item Reads the XML file and locates all `Fabbisogno` nodes.
+#'   \item Extracts key fields (`Data`, `Mercato`, `Ora`) and dynamically captures all quantity-related fields.
+#'   \item Converts commas in values to dots for numeric compatibility.
+#'   \item Creates a wide-format `data.table` with standardized column names.
+#'   \item Reshapes the data to a long format for better analysis and visualization.
+#' }
+#'
+#' @examples
+#' \dontrun{
+#' # Process an XML file
+#' file_path <- "path/to/MGPFabbisogno.xml"
+#' fabb_data <- gme_dam_fabb_xml_to_data(file_path)
+#' head(fabb_data)
+#' }
+#'
+#' @import data.table
+#' @import xml2
+#' @export
+gme_dam_fabb_xml_to_data <- function(xml_file_path) {
+
+    # Read the XML file
+    xml_data <- read_xml(xml_file_path)
+
+    # Find all 'Fabbisogno' nodes
+    fabbisogno_nodes <- xml_find_all(xml_data, ".//Fabbisogno")
+
+    # Extract the data from each 'Fabbisogno' element
+    data_list <- lapply(fabbisogno_nodes, function(node) {
+        list(
+            Data = xml_text(xml_find_first(node, ".//Data")),
+            Mercato = xml_text(xml_find_first(node, ".//Mercato")),
+            Ora = xml_text(xml_find_first(node, ".//Ora")),
+            Italia = xml_text(xml_find_first(node, ".//Italia")),
+            CALA = xml_text(xml_find_first(node, ".//CALA")),
+            CNOR = xml_text(xml_find_first(node, ".//CNOR")),
+            CSUD = xml_text(xml_find_first(node, ".//CSUD")),
+            NORD = xml_text(xml_find_first(node, ".//NORD")),
+            SARD = xml_text(xml_find_first(node, ".//SARD")),
+            SICI = xml_text(xml_find_first(node, ".//SICI")),
+            SUD = xml_text(xml_find_first(node, ".//SUD"))
+        )
+    })
+
+    # Convert the list to a data.table
+    data_df <- rbindlist(data_list, fill = TRUE)
+
+    data_df[, Data := as.Date(Data, format = "%Y%m%d")]
+    setnames(data_df, c('Data', 'Mercato', 'Ora'), c('DATE', 'MARKET', 'HOUR'))
+    data_df_lg <- melt(data_df, id.vars = c('DATE', 'HOUR', 'MARKET'), variable.name = 'ZONE', value.name = 'VALUE')
+    data_df_lg[, VALUE := as.numeric(gsub(",", ".", VALUE))]
+    data_df_lg[, UNIT := 'MWh']
+
+    return(data_df_lg)
+}
+
+
+
+#' Process GME DAM Liquidity XML Data
+#'
+#' This function processes a GME Day-Ahead Market (DAM) Liquidity XML file and extracts
+#' structured data, converting it into a tidy `data.table` format. It dynamically parses
+#' all quantity fields, standardizes their names, and reshapes the data into long format.
+#'
+#' @param xml_file_path A string specifying the file path to the XML file containing quantity data.
+#'
+#' @return A `data.table` in long format with the following columns:
+#' \itemize{
+#'   \item `DATE`: Date of the record (as a Date object).
+#'   \item `MARKET`: Market type, typically `MGP`.
+#'   \item `HOUR`: Hour of the record (integer).
+#'   \item `ZONE`: Zone or region (e.g., `CSUD`, `CALA`).
+#'   \item `VALUE`: Numeric value of the quantity in MWh.
+#'   \item `UNIT`: Unit of the value, default is `MWh`.
+#' }
+#'
+#' @details
+#' The function performs the following steps:
+#' \enumerate{
+#'   \item Reads the XML file and locates all `Quantita` nodes.
+#'   \item Extracts key fields (`Data`, `Mercato`, `Ora`) and dynamically captures all quantity-related fields.
+#'   \item Converts commas in values to dots for numeric compatibility.
+#'   \item Creates a wide-format `data.table` with standardized column names.
+#'   \item Reshapes the data to a long format for better analysis and visualization.
+#' }
+#'
+#' @examples
+#' \dontrun{
+#' # Process an XML file
+#' file_path <- "path/to/MGPLiquidity.xml"
+#' liquidity_data <- gme_dam_liq_xml_to_data(file_path)
+#' head(liquidity_data)
+#' }
+#'
+#' @import data.table
+#' @import xml2
+#' @export
+gme_dam_liq_xml_to_data <- function(xml_file_path) {
+
+    # Read the XML file
+    xml_data <- read_xml(xml_file_path)
+
+    # Find all 'Fabbisogno' nodes
+    dati_nodes = xml_find_all(xml_data, ".//DatiLiquidita")
+
+    # Extract data from each node
+    data_df = data.table(
+        Data = xml_text(xml_find_all(dati_nodes, "./Data")),
+        Mercato = xml_text(xml_find_all(dati_nodes, "./Mercato")),
+        Ora = as.integer(xml_text(xml_find_all(dati_nodes, "./Ora"))),
+        Liquidita = as.numeric(gsub(",", ".", xml_text(xml_find_all(dati_nodes, "./Liquidita"))))
+    )
+
+    data_df[, Data := as.Date(Data, format = "%Y%m%d")]
+    setnames(data_df, c('Data', 'Mercato', 'Ora'), c('DATE', 'MARKET', 'HOUR'))
+    data_df_lg <- melt(data_df, id.vars = c('DATE', 'HOUR', 'MARKET'), variable.name = 'ZONE', value.name = 'VALUE')
+    data_df_lg[, VALUE := as.numeric(gsub(",", ".", VALUE))]
+    data_df_lg[, UNIT := 'MWh']
+
+    return(data_df_lg)
+}
+
+
+
+#' Process GME DAM Transiti XML Data
+#'
+#' This function processes a GME Day-Ahead Market (DAM) Transiti XML file and extracts
+#' structured data, converting it into a tidy `data.table` format. It dynamically parses
+#' all quantity fields, standardizes their names, and reshapes the data into long format.
+#'
+#' @param xml_file_path A string specifying the file path to the XML file containing quantity data.
+#'
+#' @return A `data.table` in long format with the following columns:
+#' \itemize{
+#'   \item `DATE`: Date of the record (as a Date object).
+#'   \item `MARKET`: Market type, typically `MGP`.
+#'   \item `HOUR`: Hour of the record (integer).
+#'   \item `ZONE`: Zone or region (e.g., `CSUD`, `CALA`).
+#'   \item `VALUE`: Numeric value of the quantity in MWh.
+#'   \item `UNIT`: Unit of the value, default is `MWh`.
+#' }
+#'
+#' @details
+#' The function performs the following steps:
+#' \enumerate{
+#'   \item Reads the XML file and locates all `Transiti` nodes.
+#'   \item Extracts key fields (`Data`, `Mercato`, `Ora`) and dynamically captures all quantity-related fields.
+#'   \item Converts commas in values to dots for numeric compatibility.
+#'   \item Creates a wide-format `data.table` with standardized column names.
+#'   \item Reshapes the data to a long format for better analysis and visualization.
+#' }
+#'
+#' @examples
+#' \dontrun{
+#' # Process an XML file
+#' file_path <- "path/to/MGPTransiti.xml"
+#' transit_data <- gme_dam_tran_xml_to_data(file_path)
+#' head(transit_data)
+#' }
+#'
+#' @import data.table
+#' @import xml2
+#' @export
+gme_dam_tran_xml_to_data <- function(xml_file_path) {
+
+    # Read the XML file
+    xml_data <- read_xml(xml_file_path)
+
+    # Extract all "MgpTransiti" nodes
+    transiti_nodes = xml_find_all(xml_data, ".//MgpTransiti")
+
+    # Extract data from each node
+    data_df = data.table(
+        Data = xml_text(xml_find_all(transiti_nodes, "./Data")),
+        Mercato = xml_text(xml_find_all(transiti_nodes, "./Mercato")),
+        Ora = as.integer(xml_text(xml_find_all(transiti_nodes, "./Ora"))),
+        Da = xml_text(xml_find_all(transiti_nodes, "./Da")),
+        A = xml_text(xml_find_all(transiti_nodes, "./A")),
+        VALUE = as.numeric(gsub(",", ".", xml_text(xml_find_all(transiti_nodes, "./TransitoMWh"))))
+    )
+
+    data_df[, Data := as.Date(Data, format = "%Y%m%d")]
+    data_df[, Da := paste0('from_', Da)]
+    data_df[, A := paste0('to_', A)]
+    setnames(data_df, c('Data', 'Mercato', 'Ora'), c('DATE', 'MARKET', 'HOUR'))
+
+    melted_data = melt(
+        data_df,
+        id.vars = c("DATE", "MARKET", "HOUR", 'VALUE'),
+        measure.vars = c("Da", "A"),
+        variable.name = "Type",
+        value.name = "ZONE"
+    )
+    # Rename TransitoMWh to VALUE and add it to the melted table
+    melted_data[, Type := NULL]
+    melted_data[, VALUE := as.numeric(gsub(",", ".", VALUE))]
+    melted_data[, UNIT := 'MWh']
+
+    return(melted_data)
+}
+
+
+
+#' Process GME DAM Limiti Transiti XML Data
+#'
+#' This function processes a GME Day-Ahead Market (DAM) Limiti Transiti XML file and extracts
+#' structured data, converting it into a tidy `data.table` format. It dynamically parses
+#' all quantity fields, standardizes their names, and reshapes the data into long format.
+#'
+#' @param xml_file_path A string specifying the file path to the XML file containing quantity data.
+#'
+#' @return A `data.table` in long format with the following columns:
+#' \itemize{
+#'   \item `DATE`: Date of the record (as a Date object).
+#'   \item `MARKET`: Market type, typically `MGP`.
+#'   \item `HOUR`: Hour of the record (integer).
+#'   \item `ZONE`: Zone or region (e.g., `CSUD`, `CALA`).
+#'   \item `VALUE`: Numeric value of the quantity in MWh.
+#'   \item `UNIT`: Unit of the value, default is `MWh`.
+#' }
+#'
+#' @details
+#' The function performs the following steps:
+#' \enumerate{
+#'   \item Reads the XML file and locates all `Limiti Transiti` nodes.
+#'   \item Extracts key fields (`Data`, `Mercato`, `Ora`) and dynamically captures all quantity-related fields.
+#'   \item Converts commas in values to dots for numeric compatibility.
+#'   \item Creates a wide-format `data.table` with standardized column names.
+#'   \item Reshapes the data to a long format for better analysis and visualization.
+#' }
+#'
+#' @examples
+#' \dontrun{
+#' # Process an XML file
+#' file_path <- "path/to/MGPTransiti.xml"
+#' transit_data <- gme_dam_tran_xml_to_data(file_path)
+#' head(transit_data)
+#' }
+#'
+#' @import data.table
+#' @import xml2
+#' @export
+gme_dam_limtran_xml_to_data <- function(xml_file_path) {
+
+    # Read the XML file
+    xml_data <- read_xml(xml_file_path)
+
+    # Extract all "LimitiTransito" nodes
+    transiti_nodes = xml_find_all(xml_data, ".//LimitiTransito")
+
+    # Extract raw data into a data.table
+    data_df = data.table(
+        Data = xml_text(xml_find_all(transiti_nodes, "./Data")),
+        Mercato = xml_text(xml_find_all(transiti_nodes, "./Mercato")),
+        Ora = as.integer(xml_text(xml_find_all(transiti_nodes, "./Ora"))),
+        Da = xml_text(xml_find_all(transiti_nodes, "./Da")),
+        A = xml_text(xml_find_all(transiti_nodes, "./A")),
+        Limite = as.numeric(gsub(",", ".", xml_text(xml_find_all(transiti_nodes, "./Limite")))),
+        Coefficiente = as.numeric(gsub(",", ".", xml_text(xml_find_all(transiti_nodes, "./Coefficiente"))))
+    )
+
+    data_df[, Data := as.Date(Data, format = "%Y%m%d")]
+    data_df[, Da := paste0('from_', Da)]
+    data_df[, A := paste0('to_', A)]
+    setnames(data_df, c('Data', 'Mercato', 'Ora'), c('DATE', 'MARKET', 'HOUR'))
+
+    melted_data = melt(
+        data_df,
+        id.vars = c("DATE", "MARKET", "HOUR", "Limite", "Coefficiente"),
+        measure.vars = c("Da", "A"),
+        variable.name = "Type",
+        value.name = "ZONE"
+    )
+    # Rename TransitoMWh to VALUE and add it to the melted table
+    melted_data[, Type := NULL]
+    melted_data = melt(
+        melted_data,
+        id.vars = c("DATE", "MARKET", "HOUR", "ZONE"),
+        measure.vars = c("Limite", "Coefficiente"),
+        variable.name = "VARIABLE",
+        value.name = "VALUE"
+    )
+
+    melted_data[, VALUE := as.numeric(gsub(",", ".", VALUE))]
+    melted_data[, VARIABLE := as.character(VARIABLE)]
+    melted_data[, UNIT := 'MW']
+
+    return(melted_data)
+}

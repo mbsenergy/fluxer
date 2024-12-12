@@ -47,23 +47,23 @@ print(dt_mgp_prices)
 
 ## 1.4 Download RAW DATA------------
 
-lapply(last_n_files, function(file) {
-    tryCatch({
-        # Call mgp_download_file with explicit arguments
-        mgp_download_file(
-            filename = file,
-            data_type = data_type,
-            output_dir = output_dir,
-            username = username,       # FTP username for authentication
-            password = password,       # FTP password for authentication
-            raw = TRUE
-        )
-    }, error = function(e) {
-        # In case of an error (e.g., failed download or processing), return NULL
-        message("Error processing file: ", file, " - ", e$message)
-        return(NULL)
-    })
-})
+# lapply(last_n_files, function(file) {
+#     tryCatch({
+#         # Call mgp_download_file with explicit arguments
+#         mgp_download_file(
+#             filename = file,
+#             data_type = data_type,
+#             output_dir = output_dir,
+#             username = username,       # FTP username for authentication
+#             password = password,       # FTP password for authentication
+#             raw = TRUE
+#         )
+#     }, error = function(e) {
+#         # In case of an error (e.g., failed download or processing), return NULL
+#         message("Error processing file: ", file, " - ", e$message)
+#         return(NULL)
+#     })
+# })
 
 
 
@@ -109,6 +109,68 @@ print(dt_mgp_quantita)
 
 ## 2.4 Download RAW DATA------------
 
+# lapply(last_n_files, function(file) {
+#     tryCatch({
+#         # Call mgp_download_file with explicit arguments
+#         mgp_download_file(
+#             filename = file,
+#             data_type = data_type,
+#             output_dir = output_dir,
+#             username = username,       # FTP username for authentication
+#             password = password,       # FTP password for authentication
+#             raw = TRUE
+#         )
+#     }, error = function(e) {
+#         # In case of an error (e.g., failed download or processing), return NULL
+#         message("Error processing file: ", file, " - ", e$message)
+#         return(NULL)
+#     })
+# })
+
+
+
+# MGP Fabbisogno -----------------
+
+## 3.1 Parameters ------------
+n <- 5
+
+data_type <- 'MGP_Fabbisogno'
+username <- "PIASARACENO"
+password <- "18N15C9R"
+output_dir = "data"
+
+
+## 3.2 Get files available at GME folder ------------
+mgp_fabb_files = gme_mgp_get_files(data_type = data_type, output_dir = output_dir, username = username, password = password)
+
+last_n_files <- tail(mgp_fabb_files, n)
+print(last_n_files)
+
+## 3.3 Download DATASET CLEAN------------
+
+list_mgp_fabb <- lapply(last_n_files, function(file) {
+    tryCatch({
+        # Call mgp_download_file with explicit arguments
+        mgp_download_file(
+            filename = file,
+            data_type = data_type,
+            output_dir = output_dir,
+            username = username,       # FTP username for authentication
+            password = password,       # FTP password for authentication
+            raw = FALSE
+        )
+    }, error = function(e) {
+        # In case of an error (e.g., failed download or processing), return NULL
+        message("Error processing file: ", file, " - ", e$message)
+        return(NULL)
+    })
+})
+
+dt_mgp_fabb = rbindlist(list_mgp_fabb)
+print(dt_mgp_fabb)
+
+## 3.4 Download RAW DATA------------
+
 lapply(last_n_files, function(file) {
     tryCatch({
         # Call mgp_download_file with explicit arguments
@@ -127,10 +189,189 @@ lapply(last_n_files, function(file) {
     })
 })
 
-xml_file_path = file.path('data', '20241213MGPPrezzi.xml')
-xml_data_p <- read_xml(xml_file_path)
 
-xml_file_path = file.path('data', '20241213MGPQuantita.xml')
-xml_data <- read_xml(xml_file_path)
 
-gme_dam_quantity_xml_to_data(xml_file_path)
+
+# MGP Liquidita -----------------
+
+## 4.1 Parameters ------------
+n <- 5
+
+data_type <- 'MGP_Liquidita'
+username <- "PIASARACENO"
+password <- "18N15C9R"
+output_dir = "data"
+
+
+## 4.2 Get files available at GME folder ------------
+mgp_liq_files = gme_mgp_get_files(data_type = data_type, output_dir = output_dir, username = username, password = password)
+
+last_n_files <- tail(mgp_liq_files, n)
+print(last_n_files)
+
+## 4.3 Download DATASET CLEAN------------
+
+list_mgp_liq <- lapply(last_n_files, function(file) {
+    tryCatch({
+        # Call mgp_download_file with explicit arguments
+        mgp_download_file(
+            filename = file,
+            data_type = data_type,
+            output_dir = output_dir,
+            username = username,       # FTP username for authentication
+            password = password,       # FTP password for authentication
+            raw = FALSE
+        )
+    }, error = function(e) {
+        # In case of an error (e.g., failed download or processing), return NULL
+        message("Error processing file: ", file, " - ", e$message)
+        return(NULL)
+    })
+})
+
+dt_mgp_liq = rbindlist(list_mgp_liq)
+print(dt_mgp_liq)
+
+## 4.4 Download RAW DATA------------
+
+# lapply(last_n_files, function(file) {
+#     tryCatch({
+#         # Call mgp_download_file with explicit arguments
+#         mgp_download_file(
+#             filename = file,
+#             data_type = data_type,
+#             output_dir = output_dir,
+#             username = username,       # FTP username for authentication
+#             password = password,       # FTP password for authentication
+#             raw = TRUE
+#         )
+#     }, error = function(e) {
+#         # In case of an error (e.g., failed download or processing), return NULL
+#         message("Error processing file: ", file, " - ", e$message)
+#         return(NULL)
+#     })
+# })
+
+
+
+# MGP Transiti -----------------
+
+## 5.1 Parameters ------------
+n <- 5
+
+data_type <- 'MGP_Transiti'
+username <- "PIASARACENO"
+password <- "18N15C9R"
+output_dir = "data"
+
+
+## 5.2 Get files available at GME folder ------------
+mgp_tran_files = gme_mgp_get_files(data_type = data_type, output_dir = output_dir, username = username, password = password)
+
+last_n_files <- tail(mgp_tran_files, n)
+print(last_n_files)
+
+## 5.3 Download DATASET CLEAN------------
+
+list_mgp_tran <- lapply(last_n_files, function(file) {
+    tryCatch({
+        # Call mgp_download_file with explicit arguments
+        mgp_download_file(
+            filename = file,
+            data_type = data_type,
+            output_dir = output_dir,
+            username = username,       # FTP username for authentication
+            password = password,       # FTP password for authentication
+            raw = FALSE
+        )
+    }, error = function(e) {
+        # In case of an error (e.g., failed download or processing), return NULL
+        message("Error processing file: ", file, " - ", e$message)
+        return(NULL)
+    })
+})
+
+dt_mgp_tran = rbindlist(list_mgp_tran)
+print(dt_mgp_tran)
+
+## 5.4 Download RAW DATA------------
+
+# lapply(last_n_files, function(file) {
+#     tryCatch({
+#         # Call mgp_download_file with explicit arguments
+#         mgp_download_file(
+#             filename = file,
+#             data_type = data_type,
+#             output_dir = output_dir,
+#             username = username,       # FTP username for authentication
+#             password = password,       # FTP password for authentication
+#             raw = TRUE
+#         )
+#     }, error = function(e) {
+#         # In case of an error (e.g., failed download or processing), return NULL
+#         message("Error processing file: ", file, " - ", e$message)
+#         return(NULL)
+#     })
+# })
+
+
+
+# MGP Limiti Transiti -----------------
+
+## 6.1 Parameters ------------
+n <- 5
+
+data_type <- 'MGP_LimitiTransito'
+username <- "PIASARACENO"
+password <- "18N15C9R"
+output_dir = "data"
+
+
+## 6.2 Get files available at GME folder ------------
+mgp_limtran_files = gme_mgp_get_files(data_type = data_type, output_dir = output_dir, username = username, password = password)
+
+last_n_files <- tail(mgp_limtran_files, n)
+print(last_n_files)
+
+## 6.3 Download DATASET CLEAN------------
+
+list_mgp_limtran <- lapply(last_n_files, function(file) {
+    tryCatch({
+        # Call mgp_download_file with explicit arguments
+        mgp_download_file(
+            filename = file,
+            data_type = data_type,
+            output_dir = output_dir,
+            username = username,       # FTP username for authentication
+            password = password,       # FTP password for authentication
+            raw = FALSE
+        )
+    }, error = function(e) {
+        # In case of an error (e.g., failed download or processing), return NULL
+        message("Error processing file: ", file, " - ", e$message)
+        return(NULL)
+    })
+})
+
+dt_mgp_limtran = rbindlist(list_mgp_limtran)
+print(dt_mgp_limtran)
+
+## 6.4 Download RAW DATA------------
+
+# lapply(last_n_files, function(file) {
+#     tryCatch({
+#         # Call mgp_download_file with explicit arguments
+#         mgp_download_file(
+#             filename = file,
+#             data_type = data_type,
+#             output_dir = output_dir,
+#             username = username,       # FTP username for authentication
+#             password = password,       # FTP password for authentication
+#             raw = TRUE
+#         )
+#     }, error = function(e) {
+#         # In case of an error (e.g., failed download or processing), return NULL
+#         message("Error processing file: ", file, " - ", e$message)
+#         return(NULL)
+#     })
+# })
