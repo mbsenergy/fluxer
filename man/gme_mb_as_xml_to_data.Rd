@@ -14,6 +14,7 @@ A \code{data.table} in long format with the following columns:
 \itemize{
 \item \code{DATE}: Date of the record (as a Date object).
 \item \code{MARKET}: Market type, typically \verb{MS AS}.
+\item \code{TIME}: Hour/minutes of the record (datetime).
 \item \code{HOUR}: Hour of the record (integer).
 \item \code{ZONE}: Zone or region (e.g., \code{CSUD}, \code{CALA}).
 \item \code{VALUE}: Numeric value of the quantity in MWh.

@@ -70,7 +70,6 @@ print(dt_mgp_prices)
 # MGP Quantità -----------------
 
 ## 2.1 Parameters ------------
-n <- 5
 
 data_type <- 'MGP_Quantita'
 username <- "PIASARACENO"
@@ -132,7 +131,6 @@ print(dt_mgp_quantita)
 # MGP Fabbisogno -----------------
 
 ## 3.1 Parameters ------------
-n <- 5
 
 data_type <- 'MGP_Fabbisogno'
 username <- "PIASARACENO"
@@ -171,23 +169,23 @@ print(dt_mgp_fabb)
 
 ## 3.4 Download RAW DATA------------
 
-lapply(last_n_files, function(file) {
-    tryCatch({
-        # Call mgp_download_file with explicit arguments
-        mgp_download_file(
-            filename = file,
-            data_type = data_type,
-            output_dir = output_dir,
-            username = username,       # FTP username for authentication
-            password = password,       # FTP password for authentication
-            raw = TRUE
-        )
-    }, error = function(e) {
-        # In case of an error (e.g., failed download or processing), return NULL
-        message("Error processing file: ", file, " - ", e$message)
-        return(NULL)
-    })
-})
+# lapply(last_n_files, function(file) {
+#     tryCatch({
+#         # Call mgp_download_file with explicit arguments
+#         mgp_download_file(
+#             filename = file,
+#             data_type = data_type,
+#             output_dir = output_dir,
+#             username = username,       # FTP username for authentication
+#             password = password,       # FTP password for authentication
+#             raw = TRUE
+#         )
+#     }, error = function(e) {
+#         # In case of an error (e.g., failed download or processing), return NULL
+#         message("Error processing file: ", file, " - ", e$message)
+#         return(NULL)
+#     })
+# })
 
 
 
@@ -195,7 +193,6 @@ lapply(last_n_files, function(file) {
 # MGP Liquidita -----------------
 
 ## 4.1 Parameters ------------
-n <- 5
 
 data_type <- 'MGP_Liquidita'
 username <- "PIASARACENO"
@@ -257,7 +254,6 @@ print(dt_mgp_liq)
 # MGP Transiti -----------------
 
 ## 5.1 Parameters ------------
-n <- 5
 
 data_type <- 'MGP_Transiti'
 username <- "PIASARACENO"
@@ -319,7 +315,6 @@ print(dt_mgp_tran)
 # MGP Limiti Transiti -----------------
 
 ## 6.1 Parameters ------------
-n <- 5
 
 data_type <- 'MGP_LimitiTransito'
 username <- "PIASARACENO"
@@ -381,7 +376,6 @@ print(dt_mgp_limtran)
 # MSD -----------------
 
 ## 7.1 Parameters ------------
-n <- 5
 
 data_type <- 'MSD_ServiziDispacciamento'
 username <- "PIASARACENO"
@@ -443,7 +437,6 @@ print(dt_msd_all)
 # MB RS -----------------
 
 ## 8.1 Parameters ------------
-n <- 5
 
 data_type <- 'MB_PRiservaSecondaria'
 username <- "PIASARACENO"
@@ -504,7 +497,6 @@ print(dt_mb_rs)
 # MB AS -----------------
 
 ## 9.1 Parameters ------------
-n <- 5
 
 data_type <- 'MB_PAltriServizi'
 username <- "PIASARACENO"
@@ -565,7 +557,6 @@ print(dt_mb_as)
 # MB TOTALI -----------------
 
 ## 10.1 Parameters ------------
-n <- 5
 
 data_type <- 'MB_PTotali'
 username <- "PIASARACENO"
@@ -627,7 +618,6 @@ print(dt_mb_tl)
 # XBID -----------------
 
 ## 11.1 Parameters ------------
-n <- 5
 
 data_type <- 'XBID_EsitiTotali'
 username <- "PIASARACENO"

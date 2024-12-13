@@ -118,27 +118,27 @@ mgp_download_file <- function(filename, data_type = 'MGP_Prezzi', output_dir, us
         if (isFALSE(raw)) {
             if (data_type == 'MGP_Prezzi') {
                 result_df <- gme_dam_price_xml_to_data(output_file)
-                setcolorder(result_df, c('DATE', 'HOUR', 'MARKET', 'ZONE', 'VALUE', 'UNIT'))
+                setcolorder(result_df, c('DATE', 'TIME', 'HOUR', 'MARKET', 'ZONE', 'VALUE', 'UNIT'))
             }
             if (data_type == 'MGP_Quantita') {
                 result_df <- gme_dam_quantity_xml_to_data(output_file)
-                setcolorder(result_df, c('DATE', 'HOUR', 'MARKET', 'ZONE', 'VALUE', 'UNIT'))
+                setcolorder(result_df, c('DATE', 'TIME', 'HOUR', 'MARKET', 'ZONE', 'VALUE', 'UNIT'))
             }
             if (data_type == 'MGP_Fabbisogno') {
                 result_df <- gme_dam_fabb_xml_to_data(output_file)
-                setcolorder(result_df, c('DATE', 'HOUR', 'MARKET', 'ZONE', 'VALUE', 'UNIT'))
+                setcolorder(result_df, c('DATE', 'TIME', 'HOUR', 'MARKET', 'ZONE', 'VALUE', 'UNIT'))
             }
             if (data_type == 'MGP_Liquidita') {
                 result_df <- gme_dam_liq_xml_to_data(output_file)
-                setcolorder(result_df, c('DATE', 'HOUR', 'MARKET', 'ZONE', 'VALUE', 'UNIT'))
+                setcolorder(result_df, c('DATE', 'TIME', 'HOUR', 'MARKET', 'ZONE', 'VALUE', 'UNIT'))
             }
             if (data_type == 'MGP_Transiti') {
                 result_df <- gme_dam_tran_xml_to_data(output_file)
-                setcolorder(result_df, c('DATE', 'HOUR', 'MARKET', 'ZONE', 'VALUE', 'UNIT'))
+                setcolorder(result_df, c('DATE', 'TIME', 'HOUR', 'MARKET', 'ZONE', 'VALUE', 'UNIT'))
             }
             if (data_type == 'MGP_LimitiTransito') {
                 result_df <- gme_dam_limtran_xml_to_data(output_file)
-                setcolorder(result_df, c('DATE', 'HOUR', 'MARKET', 'ZONE', 'VARIABLE', 'VALUE', 'UNIT'))
+                setcolorder(result_df, c('DATE', 'TIME', 'HOUR', 'MARKET', 'ZONE', 'VARIABLE', 'VALUE', 'UNIT'))
             }
             # Optionally remove the downloaded file after processing
         } else {
@@ -247,8 +247,9 @@ gme_dam_price_xml_to_data <- function(xml_file_path) {
     data_df <- do.call(rbind, lapply(data_list, as.data.table))
 
     data_df[, Data := as.Date(Data, format = "%Y%m%d")]
+    data_df[, TIME := paste0(sprintf("%02d", as.numeric(Ora)), ":00")]
     setnames(data_df, c('Data', 'Mercato', 'Ora'), c('DATE', 'MARKET', 'HOUR'))
-    data_df_lg <- melt(data_df, id.vars = c('DATE', 'HOUR', 'MARKET'), variable.name = 'ZONE', value.name = 'VALUE')
+    data_df_lg <- melt(data_df, id.vars = c('DATE', 'TIME', 'HOUR', 'MARKET'), variable.name = 'ZONE', value.name = 'VALUE')
     data_df_lg[, VALUE := as.numeric(gsub(",", ".", VALUE))]
     data_df_lg[, UNIT := 'EUR']
 
@@ -346,6 +347,7 @@ gme_dam_quantity_xml_to_data <- function(xml_file_path) {
     # Convert DATE and HOUR to proper formats
     data_dt_long[, DATE := as.Date(DATE, format = "%Y%m%d")]
     data_dt_long[, HOUR := as.integer(HOUR)]
+    data_dt_long[, TIME := paste0(sprintf("%02d", as.numeric(HOUR)), ":00")]
     data_dt_long[, VALUE := as.numeric(VALUE)]
 
     # Add unit for the values
@@ -368,6 +370,7 @@ gme_dam_quantity_xml_to_data <- function(xml_file_path) {
 #' \itemize{
 #'   \item `DATE`: Date of the record (as a Date object).
 #'   \item `MARKET`: Market type, typically `MGP`.
+#'   \item `TIME`: Hour/minutes of the record (datetime).
 #'   \item `HOUR`: Hour of the record (integer).
 #'   \item `ZONE`: Zone or region (e.g., `CSUD`, `CALA`).
 #'   \item `VALUE`: Numeric value of the quantity in MWh.
@@ -424,8 +427,9 @@ gme_dam_fabb_xml_to_data <- function(xml_file_path) {
     data_df <- rbindlist(data_list, fill = TRUE)
 
     data_df[, Data := as.Date(Data, format = "%Y%m%d")]
+    data_df[, TIME := paste0(sprintf("%02d", as.numeric(Ora)), ":00")]
     setnames(data_df, c('Data', 'Mercato', 'Ora'), c('DATE', 'MARKET', 'HOUR'))
-    data_df_lg <- melt(data_df, id.vars = c('DATE', 'HOUR', 'MARKET'), variable.name = 'ZONE', value.name = 'VALUE')
+    data_df_lg <- melt(data_df, id.vars = c('DATE', 'TIME', 'HOUR', 'MARKET'), variable.name = 'ZONE', value.name = 'VALUE')
     data_df_lg[, VALUE := as.numeric(gsub(",", ".", VALUE))]
     data_df_lg[, UNIT := 'MWh']
 
@@ -446,6 +450,7 @@ gme_dam_fabb_xml_to_data <- function(xml_file_path) {
 #' \itemize{
 #'   \item `DATE`: Date of the record (as a Date object).
 #'   \item `MARKET`: Market type, typically `MGP`.
+#'   \item `TIME`: Hour/minutes of the record (datetime).
 #'   \item `HOUR`: Hour of the record (integer).
 #'   \item `ZONE`: Zone or region (e.g., `CSUD`, `CALA`).
 #'   \item `VALUE`: Numeric value of the quantity in MWh.
@@ -490,8 +495,9 @@ gme_dam_liq_xml_to_data <- function(xml_file_path) {
     )
 
     data_df[, Data := as.Date(Data, format = "%Y%m%d")]
+    data_df[, TIME := paste0(sprintf("%02d", as.numeric(Ora)), ":00")]
     setnames(data_df, c('Data', 'Mercato', 'Ora'), c('DATE', 'MARKET', 'HOUR'))
-    data_df_lg <- melt(data_df, id.vars = c('DATE', 'HOUR', 'MARKET'), variable.name = 'ZONE', value.name = 'VALUE')
+    data_df_lg <- melt(data_df, id.vars = c('DATE', 'TIME', 'HOUR', 'MARKET'), variable.name = 'ZONE', value.name = 'VALUE')
     data_df_lg[, VALUE := as.numeric(gsub(",", ".", VALUE))]
     data_df_lg[, UNIT := 'MWh']
 
@@ -512,6 +518,7 @@ gme_dam_liq_xml_to_data <- function(xml_file_path) {
 #' \itemize{
 #'   \item `DATE`: Date of the record (as a Date object).
 #'   \item `MARKET`: Market type, typically `MGP`.
+#'   \item `TIME`: Hour/minutes of the record (datetime).
 #'   \item `HOUR`: Hour of the record (integer).
 #'   \item `ZONE`: Zone or region (e.g., `CSUD`, `CALA`).
 #'   \item `VALUE`: Numeric value of the quantity in MWh.
@@ -571,6 +578,7 @@ gme_dam_tran_xml_to_data <- function(xml_file_path) {
     )
     # Rename TransitoMWh to VALUE and add it to the melted table
     melted_data[, Type := NULL]
+    melted_data[, TIME := paste0(sprintf("%02d", as.numeric(HOUR)), ":00")]
     melted_data[, VALUE := as.numeric(gsub(",", ".", VALUE))]
     melted_data[, UNIT := 'MWh']
 
@@ -591,6 +599,7 @@ gme_dam_tran_xml_to_data <- function(xml_file_path) {
 #' \itemize{
 #'   \item `DATE`: Date of the record (as a Date object).
 #'   \item `MARKET`: Market type, typically `MGP`.
+#'   \item `TIME`: Hour/minutes of the record (datetime).
 #'   \item `HOUR`: Hour of the record (integer).
 #'   \item `ZONE`: Zone or region (e.g., `CSUD`, `CALA`).
 #'   \item `VALUE`: Numeric value of the quantity in MWh.
@@ -660,6 +669,7 @@ gme_dam_limtran_xml_to_data <- function(xml_file_path) {
     )
 
     melted_data[, VALUE := as.numeric(gsub(",", ".", VALUE))]
+    melted_data[, TIME := paste0(sprintf("%02d", as.numeric(HOUR)), ":00")]
     melted_data[, VARIABLE := as.character(VARIABLE)]
     melted_data[, UNIT := 'MW']
 
@@ -791,23 +801,23 @@ gme_other_download_file <- function(filename, data_type = 'MSD_ServiziDispacciam
         if (isFALSE(raw)) {
             if (data_type == 'MSD_ServiziDispacciamento') {
                 result_df <- gme_msd_all_xml_to_data(output_file)
-                setcolorder(result_df, c('DATE', 'HOUR', 'MARKET', 'ZONE', 'VARIABLE', 'VALUE', 'UNIT'))
+                setcolorder(result_df, c('DATE', 'TIME', 'HOUR', 'MARKET', 'ZONE', 'VARIABLE', 'VALUE', 'UNIT'))
             }
             if (data_type == 'MB_PRiservaSecondaria') {
                 result_df <- gme_mb_rs_xml_to_data(output_file)
-                setcolorder(result_df, c('DATE', 'HOUR', 'MARKET', 'ZONE', 'VARIABLE', 'FIELD', 'VALUE', 'UNIT'))
+                setcolorder(result_df, c('DATE', 'TIME', 'HOUR', 'MARKET', 'ZONE', 'VARIABLE', 'FIELD', 'VALUE', 'UNIT'))
             }
             if (data_type == 'MB_PAltriServizi') {
                 result_df <- gme_mb_as_xml_to_data(output_file)
-                setcolorder(result_df, c('DATE', 'HOUR', 'MARKET', 'ZONE', 'VARIABLE', 'FIELD', 'VALUE', 'UNIT'))
+                setcolorder(result_df, c('DATE', 'TIME', 'HOUR', 'MARKET', 'ZONE', 'VARIABLE', 'FIELD', 'VALUE', 'UNIT'))
             }
             if (data_type == 'MB_PTotali') {
                 result_df <- gme_mb_tl_xml_to_data(output_file)
-                setcolorder(result_df, c('DATE', 'HOUR', 'MARKET', 'ZONE', 'VARIABLE', 'FIELD', 'VALUE', 'UNIT'))
+                setcolorder(result_df, c('DATE', 'TIME', 'HOUR', 'MARKET', 'ZONE', 'VARIABLE', 'FIELD', 'VALUE', 'UNIT'))
             }
             if (data_type == 'XBID_EsitiTotali') {
                 result_df <- gme_xbid_all_xml_to_data(output_file)
-                setcolorder(result_df, c('DATE', 'HOUR', 'MARKET', 'ZONE', 'VARIABLE', 'VALUE', 'UNIT'))
+                setcolorder(result_df, c('DATE', 'TIME', 'HOUR', 'MARKET', 'ZONE', 'VARIABLE', 'VALUE', 'UNIT'))
             }
             # Optionally remove the downloaded file after processing
         } else {
@@ -851,6 +861,7 @@ gme_other_download_file <- function(filename, data_type = 'MSD_ServiziDispacciam
 #' \itemize{
 #'   \item `DATE`: Date of the record (as a Date object).
 #'   \item `MARKET`: Market type, typically `MSD`.
+#'   \item `TIME`: Hour/minutes of the record (datetime).
 #'   \item `HOUR`: Hour of the record (integer).
 #'   \item `ZONE`: Zone or region (e.g., `CSUD`, `CALA`).
 #'   \item `VALUE`: Numeric value of the quantity in MWh.
@@ -931,6 +942,7 @@ gme_msd_all_xml_to_data <- function(xml_file_path) {
 
     melted_data[, UNIT := ifelse(grepl("MWh", VARIABLE), "MWh", "EUR")]
     melted_data[, ZONE_VARIABLE := NULL]
+    melted_data[, TIME := paste0(sprintf("%02d", as.numeric(Ora)), ":00")]
     setnames(melted_data, c('Data', 'Mercato', 'Ora'), c('DATE', 'MARKET', 'HOUR'))
 
     return(melted_data)
@@ -949,6 +961,7 @@ gme_msd_all_xml_to_data <- function(xml_file_path) {
 #' \itemize{
 #'   \item `DATE`: Date of the record (as a Date object).
 #'   \item `MARKET`: Market type, typically `MB RS`.
+#'   \item `TIME`: Hour/minutes of the record (datetime).
 #'   \item `HOUR`: Hour of the record (integer).
 #'   \item `ZONE`: Zone or region (e.g., `CSUD`, `CALA`).
 #'   \item `VALUE`: Numeric value of the quantity in MWh.
@@ -1031,6 +1044,7 @@ gme_mb_rs_xml_to_data <- function(xml_file_path) {
 
     melted_data[, UNIT := ifelse(grepl("MWh", VARIABLE), "MWh", "EUR")]
     melted_data[, ZONE_VARIABLE := NULL]
+    melted_data[, TIME := paste0(sprintf("%02d", as.numeric(Ora)), ":00")]
     setnames(melted_data, c('Data', 'Mercato', 'Ora'), c('DATE', 'MARKET', 'HOUR'))
     melted_data[, MARKET := 'MB Riserva Secondaria']
 
@@ -1050,6 +1064,7 @@ gme_mb_rs_xml_to_data <- function(xml_file_path) {
 #' \itemize{
 #'   \item `DATE`: Date of the record (as a Date object).
 #'   \item `MARKET`: Market type, typically `MS AS`.
+#'   \item `TIME`: Hour/minutes of the record (datetime).
 #'   \item `HOUR`: Hour of the record (integer).
 #'   \item `ZONE`: Zone or region (e.g., `CSUD`, `CALA`).
 #'   \item `VALUE`: Numeric value of the quantity in MWh.
@@ -1132,6 +1147,7 @@ gme_mb_as_xml_to_data <- function(xml_file_path) {
 
     melted_data[, UNIT := ifelse(grepl("MWh", VARIABLE), "MWh", "EUR")]
     melted_data[, ZONE_VARIABLE := NULL]
+    melted_data[, TIME := paste0(sprintf("%02d", as.numeric(Ora)), ":00")]
     setnames(melted_data, c('Data', 'Mercato', 'Ora'), c('DATE', 'MARKET', 'HOUR'))
     melted_data[, MARKET := 'MB Altri Servizi']
 
@@ -1151,6 +1167,7 @@ gme_mb_as_xml_to_data <- function(xml_file_path) {
 #' \itemize{
 #'   \item `DATE`: Date of the record (as a Date object).
 #'   \item `MARKET`: Market type, typically `MB Totali`.
+#'   \item `TIME`: Hour/minutes of the record (datetime).
 #'   \item `HOUR`: Hour of the record (integer).
 #'   \item `ZONE`: Zone or region (e.g., `CSUD`, `CALA`).
 #'   \item `VALUE`: Numeric value of the quantity in MWh.
@@ -1233,6 +1250,7 @@ gme_mb_tl_xml_to_data <- function(xml_file_path) {
 
     melted_data[, UNIT := ifelse(grepl("MWh", VARIABLE), "MWh", "EUR")]
     melted_data[, ZONE_VARIABLE := NULL]
+    melted_data[, TIME := paste0(sprintf("%02d", as.numeric(Ora)), ":00")]
     setnames(melted_data, c('Data', 'Mercato', 'Ora'), c('DATE', 'MARKET', 'HOUR'))
     melted_data[, MARKET := 'MB Totali']
 
@@ -1253,6 +1271,7 @@ gme_mb_tl_xml_to_data <- function(xml_file_path) {
 #' \itemize{
 #'   \item `DATE`: Date of the record (as a Date object).
 #'   \item `MARKET`: Market type, typically `XBID`.
+#'   \item `TIME`: Hour/minutes of the record (datetime).
 #'   \item `HOUR`: Hour of the record (integer).
 #'   \item `ZONE`: Zone or region (e.g., `CSUD`, `CALA`).
 #'   \item `VALUE`: Numeric value of the quantity in MWh.
@@ -1349,6 +1368,7 @@ gme_xbid_all_xml_to_data <- function(xml_file_path) {
 
     # Assign units based on the VARIABLE (for example, "MWh" or "EUR")
     melted_data[, UNIT := ifelse(grepl("MWh", VARIABLE), "MWh", "EUR")]
+    melted_data[, TIME := paste0(sprintf("%02d", as.numeric(HOUR)), ":00")]
     melted_data[, MARKET := 'XBID']
 
     return(melted_data)
