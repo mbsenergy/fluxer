@@ -25,6 +25,15 @@ gme_mgp_get_files <- function(data_type, output_dir = "data",
                               username = "PIASARACENO", password = "18N15C9R",
                               verbose = FALSE) {
 
+    allowed_data_types = c("MGP_Prezzi", "MGP_Quantita", "MGP_Fabbisogno",
+                           "MGP_Liquidita", "MGP_Transiti", "MGP_LimitiTransito")
+
+    # Validate data_type
+    if (!data_type %in% allowed_data_types) {
+        stop(paste("Invalid data_type:", data_type,
+                   ". Must be one of:", paste(allowed_data_types, collapse = ", ")))
+    }
+
     url_base = paste0('ftp://download.mercatoelettrico.org/MercatiElettrici/', data_type, '/')
 
     if (data_type == "MGP_Prezzi") {file_pattern = "\\S+MGPPrezzi\\.xml$"}
@@ -92,6 +101,15 @@ gme_mgp_get_files <- function(data_type, output_dir = "data",
 #' @importFrom xml2 read_xml xml_find_all xml_text
 #' @export
 mgp_download_file <- function(filename, data_type = 'MGP_Prezzi', output_dir, username, password, raw = FALSE) {
+
+    allowed_data_types = c("MGP_Prezzi", "MGP_Quantita", "MGP_Fabbisogno",
+                           "MGP_Liquidita", "MGP_Transiti", "MGP_LimitiTransito")
+
+    # Validate data_type
+    if (!data_type %in% allowed_data_types) {
+        stop(paste("Invalid data_type:", data_type,
+                   ". Must be one of:", paste(allowed_data_types, collapse = ", ")))
+    }
     # Construct the file URL
 
     url_base = paste0('ftp://download.mercatoelettrico.org/MercatiElettrici/', data_type, '/')
@@ -708,6 +726,16 @@ gme_rest_get_files <- function(data_type, output_dir = "data",
                               username = "PIASARACENO", password = "18N15C9R",
                               verbose = FALSE) {
 
+    # Define allowed data types
+    allowed_data_types = c("MSD_ServiziDispacciamento", "MB_PRiservaSecondaria",
+                           "MB_PAltriServizi", "MB_PTotali", "XBID_EsitiTotali")
+
+    # Validate data_type
+    if (!data_type %in% allowed_data_types) {
+        stop(paste("Invalid data_type:", data_type,
+                   ". Must be one of:", paste(allowed_data_types, collapse = ", ")))
+    }
+
     url_base = paste0('ftp://download.mercatoelettrico.org/MercatiElettrici/', data_type, '/')
 
     if (data_type == "MSD_ServiziDispacciamento") {file_pattern = "\\S+MSDServiziDispacciamento\\.xml$"}
@@ -775,6 +803,16 @@ gme_rest_get_files <- function(data_type, output_dir = "data",
 #' @export
 gme_other_download_file <- function(filename, data_type = 'MSD_ServiziDispacciamento', output_dir, username, password, raw = FALSE) {
     # Construct the file URL
+
+    # Define allowed data types
+    allowed_data_types = c("MSD_ServiziDispacciamento", "MB_PRiservaSecondaria",
+                           "MB_PAltriServizi", "MB_PTotali", "XBID_EsitiTotali")
+
+    # Validate data_type
+    if (!data_type %in% allowed_data_types) {
+        stop(paste("Invalid data_type:", data_type,
+                   ". Must be one of:", paste(allowed_data_types, collapse = ", ")))
+    }
 
     url_base = paste0('ftp://download.mercatoelettrico.org/MercatiElettrici/', data_type, '/')
     file_url <- paste0(url_base, filename)
@@ -1372,4 +1410,265 @@ gme_xbid_all_xml_to_data <- function(xml_file_path) {
     melted_data[, MARKET := 'XBID']
 
     return(melted_data)
+}
+
+
+
+# PUBBLIC OFFERS ---------------------------------------
+
+#' Retrieve Files from GME FTP Server for DAM market pubblic offers
+#'
+#' This function connects to the GME FTP server to list XML files available in a specified directory.
+#' It can filter files based on the provided `data_type`.
+#'
+#' @param data_type A string specifying the data type directory to query.
+#'        Default is "MGP_Prezzi". Can be customized for other directories.
+#' @param output_dir A string specifying the directory where output files will be saved.
+#'        Default is "data". If the directory does not exist, it will be created.
+#' @param username FTP server username. Default is "PIASARACENO".
+#' @param password FTP server password. Default is "18N15C9R".
+#' @param verbose Logical. If TRUE, prints the list of available files. Default is FALSE.
+#'
+#' @return A character vector containing the filenames that match the specified pattern,
+#'         or NULL if an error occurs.
+#' @examples
+#' \dontrun{
+#' files <- gme_mgp_get_files(data_type = "MGP_Prezzi", verbose = TRUE)
+#' }
+#' @export
+gme_offers_get_files <- function(data_type, output_dir = "data",
+                              username = "PIASARACENO", password = "18N15C9R",
+                              verbose = FALSE) {
+
+    allowed_data_types = c("MGP", "MSD", "MB",
+                           "MI-A1", "MI-A2", "MI-A3", "XBID")
+
+    # Validate data_type
+    if (!data_type %in% allowed_data_types) {
+        stop(paste("Invalid data_type:", data_type,
+                   ". Must be one of:", paste(allowed_data_types, collapse = ", ")))
+    }
+
+    mkt_data_type = paste0(data_type, '_OffertePubbliche/')
+
+    url_base = paste0('ftp://download.mercatoelettrico.org/MercatiElettrici/', mkt_data_type, '/')
+
+    if (data_type == "MGP") {file_pattern = "\\S+MGPOffertePubbliche\\.zip$"}
+    if (data_type == "MSD") {file_pattern = "\\S+MSDOffertePubbliche\\.zip$"}
+    if (data_type == "MB") {file_pattern = "\\S+MBOffertePubbliche\\.zip$"}
+    if (data_type == "MI-A1") {file_pattern = "\\S+MI\\.zip$"}
+    if (data_type == "MI-A2") {file_pattern = "\\S+MI\\.zip$"}
+    if (data_type == "MI-A3") {file_pattern = "\\S+MI\\.zip$"}
+    if (data_type == "XBID") {file_pattern = "\\S+XBIDOffertePubbliche\\.zip$"}
+
+    # Ensure output directory exists
+    if (!dir.exists(output_dir)) {
+        dir.create(output_dir, recursive = TRUE)
+    }
+
+    # List files on the FTP server
+    tryCatch({
+        ftp_list_cmd <- paste0("curl -u ", username, ":", password, " ", url_base)
+        file_list <- system(ftp_list_cmd, intern = TRUE)
+        matches <- regexpr(file_pattern, file_list)
+        files <- regmatches(file_list, matches)
+        files <- files[nzchar(files)]
+
+        # Print available files
+        if(isTRUE(verbose)) {
+            message("Available files:")
+            print(files)
+        }
+        message("[OK] Available files download.")
+        return(files)
+    }, error = function(e) {
+        message("[ERROR] Error downloading filenames from GME directory", e$message)
+        return(NULL)
+    })
+    return(files)
+}
+
+
+
+#' Download and Process MGP Data File
+#'
+#' This function downloads a file from an FTP server using provided credentials, processes the
+#' XML data from the downloaded file, and returns the processed data. After processing, the
+#' downloaded XML file is deleted.
+#'
+#' @param filename A character string representing the name of the file to be downloaded.
+#' @param username A character string representing the FTP username for authentication.
+#' @param password A character string representing the FTP password for authentication.
+#' @param output_dir A character string representing the directory where the downloaded file will be saved.
+#'
+#' @return A data frame (or `NULL` in case of an error). The data frame contains the processed data
+#'         obtained from the downloaded XML file, or `NULL` if an error occurred during download or processing.
+#'
+#' @details
+#' This function uses the `curl` package to download the file from an FTP server with the provided
+#' credentials. After downloading, it passes the downloaded file to the `gme_dam_xml_to_data` function
+#' for processing. Finally, the downloaded XML file is deleted from the local system to clean up.
+#'
+#' @examples
+#' # Example usage:
+#' result <- mgp_download_file("example.xml", "your_username", "your_password", "/path/to/output_dir")
+#' print(result)
+#'
+#' @import curl
+#' @import data.table
+#' @importFrom xml2 read_xml xml_find_all xml_text
+#' @export
+gme_download_offers_file <- function(filename, data_type = 'MGP', output_dir, username, password, raw = FALSE) {
+
+    # List of allowed data types
+    allowed_data_types <- c("MGP", "MSD", "MB", "MI-A1", "MI-A2", "MI-A3", "XBID")
+
+    # Validate the input data_type
+    if (!data_type %in% allowed_data_types) {
+        stop(paste("Invalid data_type:", data_type, ". Must be one of:", paste(allowed_data_types, collapse = ", ")))
+    }
+
+    # Construct the file URL
+    mkt_data_type <- paste0(data_type, '_OffertePubbliche/')
+    url_base <- paste0('ftp://download.mercatoelettrico.org/MercatiElettrici/', mkt_data_type)
+    file_url <- paste0(url_base, filename)
+
+    # Construct the output file path
+    output_file <- file.path(output_dir, filename)
+
+    # Create a curl handle
+    h <- curl::new_handle()
+    curl::handle_setopt(h, .list = list(
+        userpwd = paste0(username, ":", password),
+        ftp_use_epsv = TRUE  # Use passive mode for FTP
+    ))
+
+    # Attempt to download and process the file
+    result_df <- tryCatch({
+        # Download the file
+        curl::curl_download(file_url, output_file, handle = h)
+        message("File downloaded successfully: ", output_file)
+
+        # Check if the downloaded file is a zip
+        if (!grepl("\\.zip$", filename)) {
+            stop("Expected a .zip file, but got: ", filename)
+        }
+
+        # Unzip the file
+        files_in_zip <- unzip(output_file, list = TRUE)
+        if (nrow(files_in_zip) == 0) {
+            stop("The zip file contains no files.")
+        }
+
+        # Extract contents and remove the zip
+        unzip(output_file, exdir = output_dir)
+        file.remove(output_file)
+
+        # Locate the XML file
+        xml_files <- list.files(output_dir, pattern = "\\.xml$", full.names = TRUE)
+        if (length(xml_files) == 0) {
+            stop("No XML files found after extracting the zip.")
+        }
+        xml_file_name <- xml_files[1]  # Assume the first XML file
+
+        # Process the XML file
+        if (!raw) {
+                result_df <- gme_offerts_zip_to_data(xml_file_name)
+        } else {
+            message("Raw mode: Skipping processing of XML file.")
+            result_df <- NULL
+        }
+
+        result_df
+    }, error = function(e) {
+        # Handle errors
+        message("Error occurred: ", e$message)
+        NULL
+    })
+
+    # Cleanup and return results
+    if (!raw && !is.null(result_df)) {
+        message("Cleaning up intermediate files.")
+        file.remove(xml_file_name)
+    } else if (raw) {
+        message(paste("Raw XML file available at:", xml_file_name))
+    }
+
+    return(result_df)
+}
+
+
+
+
+# Define the function
+#' Process XML data and return a data frame in long format
+#'
+#' This function reads an XML file containing pricing data, extracts relevant fields
+#' from the XML structure, reshapes the data into a long format, and returns the data
+#' as a data frame.
+#'
+#' @param xml_file_path A string representing the path to the XML file to be processed.
+#'
+#' @return A data frame in long format
+#' @examples
+#' # Specify the XML file path (update with actual file path)
+#' xml_file_path <- "path/to/your/xml/file.xml"
+#'
+#' # Call the function and store the result in a data frame
+#' result_df <- gme_offerts_zip_to_data(xml_file_path)
+#'
+#' # Print the resulting data frame
+#' print(result_df)
+#' @export
+#' @noRd
+
+gme_offerts_zip_to_data <- function(xml_file_path) {
+
+    # Read the XML file
+    xml_data <- read_xml(xml_file_path)
+
+    # Find all "OfferteOperatori" nodes
+    offerte_nodes <- xml_find_all(xml_data, ".//OfferteOperatori")
+
+    # Extract data from each "OfferteOperatori" element
+    data_list <- lapply(offerte_nodes, function(node) {
+        this <- list()
+        children <- xml_children(node)
+
+        # Iterate through child elements
+        for (child in children) {
+            el_name <- xml_name(child)
+            val <- xml_text(child)
+
+            # Convert values based on their type
+            if (el_name %in% c("INTERVAL_NO", "MERIT_ORDER_NO")) {
+                val <- as.integer(val)
+            } else if (el_name == "BID_OFFER_DATE_DT") {
+                this$bid_offer_date_dt_parsed <- as.Date(val, format = "%Y%m%d")
+            } else if (el_name %in% c("QUANTITY_NO", "AWARDED_QUANTITY_NO", "ENERGY_PRICE_NO",
+                                      "ADJ_QUANTITY_NO", "AWARDED_PRICE_NO")) {
+                val <- as.numeric(val)
+            } else if (el_name == "SUBMITTED_DT") {
+                # If SUBMITTED_DT is relevant, process it here
+                this$submitted_dt <- as.POSIXct(val, format = "%Y%m%d%H%M%OS")
+            }
+
+            # Add the value to the list
+            this[[tolower(el_name)]] <- val
+        }
+
+        # Calculate the time field
+        interval_no <- this[["interval_no"]]
+        if (!is.null(interval_no) && !is.null(this$bid_offer_date_dt_parsed)) {
+            this$time <- as.POSIXct(this$bid_offer_date_dt_parsed) +
+                (interval_no * 3600) - ifelse(interval_no != 25, 60 * 60, 90 * 60)
+        }
+
+        return(this)
+    })
+
+    # Combine all parsed data into a data.table
+    data_dt <- rbindlist(data_list, fill = TRUE)
+
+    return(data_dt)
 }

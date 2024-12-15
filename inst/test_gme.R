@@ -1,3 +1,6 @@
+
+# SETUP -----------------
+
 box::use(data.table[...])
 box::use(magrittr[...])
 box::use(curl[...])
@@ -5,7 +8,9 @@ box::use(xml2[...])
 # box::use(fluxer[...])
 devtools::load_all()
 
-# MGP Price -----------------
+
+
+# PRICES:  MGP Price -----------------
 
 ## 1.1 Parameters ------------
 n <- 5
@@ -29,7 +34,7 @@ list_mgp_prices <- lapply(last_n_files, function(file) {
         # Call mgp_download_file with explicit arguments
         mgp_download_file(
             filename = file,
-            data_type = 'MGP_Prezzi',
+            data_type = data_type,
             output_dir = output_dir,
             username = username,       # FTP username for authentication
             password = password,       # FTP password for authentication
@@ -67,7 +72,7 @@ print(dt_mgp_prices)
 
 
 
-# MGP Quantità -----------------
+# PRICES:  MGP Quantità -----------------
 
 ## 2.1 Parameters ------------
 
@@ -128,7 +133,7 @@ print(dt_mgp_quantita)
 
 
 
-# MGP Fabbisogno -----------------
+# PRICES:  MGP Fabbisogno -----------------
 
 ## 3.1 Parameters ------------
 
@@ -190,7 +195,7 @@ print(dt_mgp_fabb)
 
 
 
-# MGP Liquidita -----------------
+# PRICES:  MGP Liquidita -----------------
 
 ## 4.1 Parameters ------------
 
@@ -251,7 +256,7 @@ print(dt_mgp_liq)
 
 
 
-# MGP Transiti -----------------
+# PRICES:  MGP Transiti -----------------
 
 ## 5.1 Parameters ------------
 
@@ -312,7 +317,7 @@ print(dt_mgp_tran)
 
 
 
-# MGP Limiti Transiti -----------------
+# PRICES:  MGP Limiti Transiti -----------------
 
 ## 6.1 Parameters ------------
 
@@ -373,7 +378,7 @@ print(dt_mgp_limtran)
 
 
 
-# MSD -----------------
+# PRICES:  MSD -----------------
 
 ## 7.1 Parameters ------------
 
@@ -434,7 +439,7 @@ print(dt_msd_all)
 
 
 
-# MB RS -----------------
+# PRICES:  MB RS -----------------
 
 ## 8.1 Parameters ------------
 
@@ -494,7 +499,7 @@ print(dt_mb_rs)
 # })
 
 
-# MB AS -----------------
+# PRICES: MB AS -----------------
 
 ## 9.1 Parameters ------------
 
@@ -554,7 +559,7 @@ print(dt_mb_as)
 # })
 
 
-# MB TOTALI -----------------
+# PRICES: MB TOTALI -----------------
 
 ## 10.1 Parameters ------------
 
@@ -615,7 +620,7 @@ print(dt_mb_tl)
 
 
 
-# XBID -----------------
+# PRICES: XBID -----------------
 
 ## 11.1 Parameters ------------
 
@@ -673,5 +678,175 @@ print(dt_xbid_all)
 #         return(NULL)
 #     })
 # })
+
+
+
+# OFFERS: MGP -----------------
+
+## 1.1 Parameters ------------
+n <- 1
+
+data_type <- 'MGP'
+username <- "PIASARACENO"
+password <- "18N15C9R"
+output_dir = "inst/data"
+
+
+## 1.2 Get files available at GME folder ------------
+gme_mgp_offers_files = gme_offers_get_files(data_type = data_type, output_dir = output_dir, username = username, password = password)
+
+last_n_files <- tail(gme_mgp_offers_files, n)
+print(last_n_files)
+
+
+## 1.3 Download DATASET CLEAN------------
+
+list_mgp_offers <- lapply(last_n_files, function(file) {
+    tryCatch({
+        # Call mgp_download_file with explicit arguments
+        gme_download_offers_file(
+            filename = file,
+            data_type = data_type,
+            output_dir = output_dir,
+            username = username,       # FTP username for authentication
+            password = password,       # FTP password for authentication
+            raw = FALSE
+        )
+    }, error = function(e) {
+        # In case of an error (e.g., failed download or processing), return NULL
+        message("Error processing file: ", file, " - ", e$message)
+        return(NULL)
+    })
+})
+
+dt_mgp_offers = rbindlist(list_mgp_offers)
+print(dt_mgp_offers)
+
+
+
+# OFFERS: MSD -----------------
+
+## 2.1 Parameters ------------
+
+data_type <- 'MSD'
+username <- "PIASARACENO"
+password <- "18N15C9R"
+output_dir = "inst/data"
+
+
+## 2.2 Get files available at GME folder ------------
+gme_msd_offers_files = gme_offers_get_files(data_type = data_type, output_dir = output_dir, username = username, password = password)
+
+last_n_files <- tail(gme_msd_offers_files, n)
+print(last_n_files)
+
+
+## 2.3 Download DATASET CLEAN------------
+
+list_msd_offers <- lapply(last_n_files, function(file) {
+    tryCatch({
+        # Call mgp_download_file with explicit arguments
+        gme_download_offers_file(
+            filename = file,
+            data_type = data_type,
+            output_dir = output_dir,
+            username = username,       # FTP username for authentication
+            password = password,       # FTP password for authentication
+            raw = FALSE
+        )
+    }, error = function(e) {
+        # In case of an error (e.g., failed download or processing), return NULL
+        message("Error processing file: ", file, " - ", e$message)
+        return(NULL)
+    })
+})
+
+dt_msd_offers = rbindlist(list_msd_offers)
+print(dt_msd_offers)
+
+
+
+# OFFERS: MB -----------------
+
+## 3.1 Parameters ------------
+
+data_type <- 'MB'
+username <- "PIASARACENO"
+password <- "18N15C9R"
+output_dir = "inst/data"
+
+
+## 3.2 Get files available at GME folder ------------
+gme_mb_offers_files = gme_offers_get_files(data_type = data_type, output_dir = output_dir, username = username, password = password)
+
+last_n_files <- tail(gme_mb_offers_files, n)
+print(last_n_files)
+
+
+## 3.3 Download DATASET CLEAN------------
+
+list_mb_offers <- lapply(last_n_files, function(file) {
+    tryCatch({
+        # Call mgp_download_file with explicit arguments
+        gme_download_offers_file(
+            filename = file,
+            data_type = data_type,
+            output_dir = output_dir,
+            username = username,       # FTP username for authentication
+            password = password,       # FTP password for authentication
+            raw = FALSE
+        )
+    }, error = function(e) {
+        # In case of an error (e.g., failed download or processing), return NULL
+        message("Error processing file: ", file, " - ", e$message)
+        return(NULL)
+    })
+})
+
+dt_mb_offers = rbindlist(list_mb_offers)
+print(dt_mb_offers)
+
+
+
+# OFFERS: XBID -----------------
+
+## 4.1 Parameters ------------
+
+data_type <- 'XBID'
+username <- "PIASARACENO"
+password <- "18N15C9R"
+output_dir = "inst/data"
+
+
+## 4.2 Get files available at GME folder ------------
+gme_xbid_offers_files = gme_offers_get_files(data_type = data_type, output_dir = output_dir, username = username, password = password)
+
+last_n_files <- tail(gme_xbid_offers_files, n)
+print(last_n_files)
+
+
+## 4.3 Download DATASET CLEAN------------
+
+list_xbid_offers <- lapply(last_n_files, function(file) {
+    tryCatch({
+        # Call mgp_download_file with explicit arguments
+        gme_download_offers_file(
+            filename = file,
+            data_type = data_type,
+            output_dir = output_dir,
+            username = username,       # FTP username for authentication
+            password = password,       # FTP password for authentication
+            raw = FALSE
+        )
+    }, error = function(e) {
+        # In case of an error (e.g., failed download or processing), return NULL
+        message("Error processing file: ", file, " - ", e$message)
+        return(NULL)
+    })
+})
+
+dt_xbid_offers = rbindlist(list_xbid_offers)
+print(dt_xbid_offers)
+
 
 

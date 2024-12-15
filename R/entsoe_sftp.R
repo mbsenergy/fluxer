@@ -1,3 +1,91 @@
+#' Retrieve and Process ENTSO-E Actual Generation Data
+#'
+#' This function retrieves and processes the ENTSO-E actual generation data for a specified year and month.
+#' It supports an option to either retain or delete the raw CSV file after processing based on the `raw` argument.
+#' It also allows specifying the output folder for the downloaded CSV file.
+#'
+#' @param year_data Numeric. The year for which to download the ENTSO-E data (e.g., 2024).
+#' @param month_data Numeric. The month for which to download the ENTSO-E data (e.g., 10 for October).
+#' @param raw Logical. If `TRUE`, keeps the downloaded CSV file after processing. If `FALSE`, the CSV file is deleted after being read. Default is `FALSE`.
+#' @param api_key Character. Your ENTSO-E API key. Passed to `entsoe_download_file` for authenticating the download request. Default is `Sys.getenv('ENTSOE_KEY')`.
+#' @param output_folder Character. The folder where the raw CSV file will be saved. Default is `tempdir()`.
+#'
+#' @return A `data.table` in long format with the following columns:
+#' \describe{
+#'   \item{DATE}{The date of the data point.}
+#'   \item{TIME}{The time of the data point in `HH:MM` format.}
+#'   \item{HOUR}{The hour extracted from the `DATETIME` column as an integer.}
+#'   \item{RESOLUTION}{The resolution code (e.g., `quarter-hour`, `hourly`).}
+#'   \item{CODE_MAP}{The map code (e.g., country, bidding zone).}
+#'   \item{CODE_EIC}{The EIC code for the area (e.g., grid or market region).}
+#'   \item{PRODUCTION_TYPE}{The type of power generation (e.g., "Fossil Oil", "Wind Onshore").}
+#'   \item{ASSET_CATEGORY}{The category of the asset (e.g., "Thermal", "Wind", etc.).}
+#'   \item{ACTUAL_GENERATION}{The actual generation output for the given time period.}
+#'   \item{ACTUAL_CONSUMPTION}{The actual consumption for the given time period.}
+#'   \item{UPDATETIME}{The last update time for the data entry.}
+#'   \item{VARIABLE}{The variable being measured, either "ACTUAL_GENERATION" or "ACTUAL_CONSUMPTION".}
+#'   \item{VALUE}{The value for the corresponding variable.}
+#' }
+#'
+#' @examples
+#' \dontrun{
+#' # Download and process the data for October 2024, keeping the CSV file
+#' result_raw <- entsoe_actual_generation(2024, 10, raw = TRUE)
+#'
+#' # Download and process the data for October 2024, deleting the CSV file after processing
+#' result <- entsoe_actual_generation(2024, 10)
+#' }
+#'
+#' @export
+entsoe_actual_generation = function(year_data, month_data, raw = FALSE, api_key = Sys.getenv('ENTSOE_KEY'), output_folder = tempdir()) {
+
+    # Ensure the output folder exists
+    if (!dir.exists(output_folder)) {
+        dir.create(output_folder, recursive = TRUE)
+    }
+
+    # Define the output file path in the specified folder
+    OUT_TEMP = file.path(output_folder, paste0('ACTUAL_GEN_', as.integer(year_data), as.integer(month_data), '.csv'))
+
+    # Download the file using the entsoe_download_file function
+    entsoe_download_file(basis_name = 'AggregatedGenerationPerType_16.1.B_C', year = as.integer(year_data), month = as.integer(month_data), output_file = OUT_TEMP)
+
+    # Read the downloaded CSV file into a data.table
+    actual_gen = fread(OUT_TEMP)
+
+    # Clean and transform the data
+    actual_gen = actual_gen[, .(DATETIME = DateTime, RESOLUTION = ResolutionCode,
+                                CODE_EIC = AreaCode, PRODUCTION_TYPE = ProductionType,
+                                CODE_MAP = MapCode,
+                                ACTUAL_GENERATION = ActualGenerationOutput,
+                                ACTUAL_CONSUMPTION = ActualConsumption,
+                                UPDATETIME = UpdateTime)]
+
+    actual_gen[, DATETIME := as.POSIXct(DATETIME, format = "%Y-%m-%d %H:%M:%OS")]
+    actual_gen[, DATE := as.Date(DATETIME)]
+    actual_gen[, HOUR := as.integer(format(DATETIME, "%H"))]
+    actual_gen[, TIME := format(DATETIME, "%H:%M")]
+
+    # Merge with asset_types to include asset category
+    actual_gen = merge(actual_gen, asset_types[, .(PRODUCTION_TYPE, ASSET_CATEGORY)], by = 'PRODUCTION_TYPE')
+
+    # Drop the original DATETIME column and reorder columns
+    actual_gen[, DATETIME := NULL]
+    setcolorder(actual_gen, c('DATE', 'TIME', 'HOUR', 'RESOLUTION', 'CODE_MAP', 'CODE_EIC', 'PRODUCTION_TYPE', 'ASSET_CATEGORY', 'ACTUAL_GENERATION', 'ACTUAL_CONSUMPTION'))
+
+    # Reshape the data into long format
+    actual_gen = melt(actual_gen, id.vars = c('DATE', 'TIME', 'HOUR', 'RESOLUTION', 'CODE_MAP', 'CODE_EIC', 'PRODUCTION_TYPE', 'ASSET_CATEGORY', 'UPDATETIME'),
+                      variable.name = 'VARIABLE', value.name = 'VALUE', variable.factor = FALSE)
+
+    # If raw is FALSE, delete the downloaded CSV file
+    if (!raw) {
+        file.remove(OUT_TEMP)
+    }
+
+    return(actual_gen)
+}
+
+
 #' Download a File from ENTSO-E SFTP Server
 #'
 #' This function downloads a specified file from the ENTSO-E SFTP server using the provided credentials.

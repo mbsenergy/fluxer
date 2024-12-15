@@ -9,8 +9,10 @@ devtools::load_all()
 ## DAM Prices ----------------------
 
 country <- "Italy (North)"
-from_data <- Sys.Date() - 365
+from_data <- Sys.Date() - 30
 to_data <- Sys.Date()
+api_key = Sys.getenv('ENTSOE_KEY')
+
 dam_prices <- entsoe_dam_prices(country, from_data, to_data, api_key = Sys.getenv('ENTSOE_KEY'))
 dam_prices %>% head()
 
@@ -18,8 +20,6 @@ dam_prices %>% head()
 # con_df
 
 # OK
-
-
 
 
 # 2. SFTP Method ---------------------------------------------
@@ -39,7 +39,7 @@ dts_1 %>% head()
 
 ## entsoe_list_files ----------------------
 
-dts_2 = entsoe_list_files(basis_name = 'DayAheadPrices_12.1.D')
+dts_2 = entsoe_list_files(basis_name = 'AggregatedGenerationPerType_16.1.B_C')
 dts_2 %>% head()
 
 # req = entsoe_create_url_files(basis_name = 'DayAheadPrices_12.1.D')
@@ -53,7 +53,7 @@ dts_2 %>% head()
 
 ## entsoe_get_file ----------------------
 
-dts_3 = entsoe_download_file(basis_name = 'DayAheadPrices_12.1.D', year = 2024, month = 10, output_file = 'prova.csv')
+dts_3 = entsoe_download_file(basis_name = 'AggregatedGenerationPerType_16.1.B_C', year = 2024, month = 10, output_file = 'prova.csv')
 
 # basis_name = 'DayAheadPrices_12.1.D'
 # year = lubridate::year(Sys.Date())
@@ -70,3 +70,13 @@ dts_3 = entsoe_download_file(basis_name = 'DayAheadPrices_12.1.D', year = 2024, 
 #                         userpwd = paste0(Sys.getenv("ENTSOE_USER"), ":", Sys.getenv("ENTSOE_PASSWORD")),
 #                         ftp_use_epsv = FALSE))  # Set to FALSE for SFTP
 # result <- curl::curl_download(file_url, output_file, handle = h)
+
+
+
+## entsoe_actual_generation ----------------------
+
+dts_4 = entsoe_actual_generation(2024, 10, raw = FALSE, output_folder = "data")
+dts_4 %>% head()
+
+# Calling the function with raw = TRUE, to keep the CSV file
+entsoe_actual_generation(2024, 10, raw = TRUE, output_folder = "data-raw")
