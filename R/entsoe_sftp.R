@@ -7,7 +7,8 @@
 #' @param year_data Numeric. The year for which to download the ENTSO-E data (e.g., 2024).
 #' @param month_data Numeric. The month for which to download the ENTSO-E data (e.g., 10 for October).
 #' @param raw Logical. If `TRUE`, keeps the downloaded CSV file after processing. If `FALSE`, the CSV file is deleted after being read. Default is `FALSE`.
-#' @param api_key Character. Your ENTSO-E API key. Passed to `entsoe_download_file` for authenticating the download request. Default is `Sys.getenv('ENTSOE_KEY')`.
+#' @param user Character. Your ENTSO-E API key. Passed to `entsoe_download_file` for authenticating the download request. Default is `Sys.getenv('ENTSOE_USER')`.
+#' @param password Character. Your ENTSO-E API key. Passed to `entsoe_download_file` for authenticating the download request. Default is `Sys.getenv('ENTSOE_PASSWORD')`.
 #' @param output_folder Character. The folder where the raw CSV file will be saved. Default is `tempdir()`.
 #'
 #' @return A `data.table` in long format with the following columns:
@@ -37,7 +38,7 @@
 #' }
 #'
 #' @export
-entsoe_actual_generation = function(year_data, month_data, raw = FALSE, api_key = Sys.getenv('ENTSOE_KEY'), output_folder = tempdir()) {
+entsoe_actual_generation = function(year_data, month_data, raw = FALSE, user = Sys.getenv("ENTSOE_USER"), password = Sys.getenv("ENTSOE_PASSWORD"), output_folder = tempdir()) {
 
     # Ensure the output folder exists
     if (!dir.exists(output_folder)) {
