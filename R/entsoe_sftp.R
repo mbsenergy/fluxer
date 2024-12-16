@@ -130,7 +130,7 @@ entsoe_download_file <- function(basis_name, year, month, user = Sys.getenv("ENT
 
     # Check if the download was successful
     if (file.exists(output_file)) {
-        message("File downloaded successfully: ", output_file)
+        message <- glue("[{crayon::bold('OK')}] DATA for {crayon::bold(output_file)} from {crayon::bold(year)} / {crayon::bold(month)} retrieved correctly")
         return(TRUE)
     } else {
         message("Failed to download the file.")

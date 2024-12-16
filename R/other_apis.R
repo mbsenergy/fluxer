@@ -62,11 +62,11 @@ agsi_gas_data <- function(country, from_date, to_date, api_key = Sys.getenv('AGS
 
     dtw <- rbind(dtw, dts, fill = TRUE)
   }
-  dtw[info := NULL]
-  dtw[url := NULL]
-  dtw[updatedAt := NULL]
-  dtw[name := NULL]
-  dtw[DATE := gasDayStart]
+  dtw[, info := NULL]
+  dtw[, url := NULL]
+  dtw[, updatedAt := NULL]
+  dtw[, name := NULL]
+  dtw[, DATE := gasDayStart]
   setnames(dtw, 'code', 'CODE_2')
   dts = melt(dtw, id.vars = c('CODE_2', 'DATE'), variable.name = 'VARIABLE', variable.factor = FALSE, value.name = 'VALUE')
   return(dts)

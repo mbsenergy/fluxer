@@ -1,7 +1,7 @@
 Package: fluxer
 Type: Package
 Title: FLUX collection of functions and utilities
-Version: 0.3.0
+Version: 0.4.0
 Authors@R: 
     person(given = "Alejandro", 
            family = "Abraham", 
@@ -22,6 +22,7 @@ Imports:
     xml2,
     crayon,
     glue,
+    tidyjson,
     magrittr
 Suggests:
     roxygen2,
