@@ -1672,3 +1672,73 @@ gme_offerts_zip_to_data <- function(xml_file_path) {
 
     return(data_dt)
 }
+
+
+# MGP ------------------------------------------------------------------------------------------------------
+
+#' Retrieve Files from GME FTP Server for DAM market
+#'
+#' This function connects to the GME FTP server to list XML files available in a specified directory.
+#' It can filter files based on the provided `data_type`.
+#'
+#' @param data_type A string specifying the data type directory to query.
+#'        Default is "MGP_Prezzi". Can be customized for other directories.
+#' @param output_dir A string specifying the directory where output files will be saved.
+#'        Default is "data". If the directory does not exist, it will be created.
+#' @param username FTP server username. Default is "PIASARACENO".
+#' @param password FTP server password. Default is "18N15C9R".
+#' @param verbose Logical. If TRUE, prints the list of available files. Default is FALSE.
+#'
+#' @return A character vector containing the filenames that match the specified pattern,
+#'         or NULL if an error occurs.
+#' @examples
+#' \dontrun{
+#' files <- gme_mgp_get_files(data_type = "MGP_Prezzi", verbose = TRUE)
+#' }
+#' @export
+gme_igi_get_files <- function(data_type, output_dir = "data",
+                               username = "PIASARACENO", password = "18N15C9R",
+                               verbose = FALSE, storico = FALSE, n = 1) {
+
+    allowed_data_types = c("IGI")
+
+    # Validate data_type
+    if (!data_type %in% allowed_data_types) {
+        stop(paste("Invalid data_type:", data_type,
+                   ". Must be one of:", paste(allowed_data_types, collapse = ", ")))
+    }
+
+    url_base = paste0('ftp://download.mercatoelettrico.org/MercatiGas/MGPGAS_IGI//', data_type, '/')
+
+    if (data_type == "IGI") {file_pattern = "\\S+IGI\\.xml$"}
+
+    # Ensure output directory exists
+    if (!dir.exists(output_dir)) {
+        dir.create(output_dir, recursive = TRUE)
+    }
+
+    # List files and directories on the FTP server
+    tryCatch({
+        # List files and directories in the specified FTP directory
+        ftp_list_cmd <- paste0("curl -u ", username, ":", password, " ftp://download.mercatoelettrico.org/MercatiGas/MGPGAS_IGI/")
+        file_list <- system(ftp_list_cmd, intern = TRUE)
+
+        # Print the list of files and directories in the FTP directory
+        message("Listing files and directories on FTP server:")
+        print(file_list)
+
+        # Match files based on the pattern (files that end with 'IGI.xml')
+        matches <- regexpr(file_pattern, file_list)
+        files <- regmatches(file_list, matches)
+        files_to_download <- files[nzchar(files)]  # Filter out empty matches
+
+        if(isTRUE(verbose)) {
+            message("Available files:")
+            print(files_to_download)
+        }
+    }, error = function(e) {
+        message("[ERROR] Error downloading files from FTP server", e$message)
+        return(NULL)
+    })
+    return(files_to_download)
+}

@@ -7,38 +7,15 @@ library(rvest)
 library(openxlsx)
 library(data.table)
 
-output_dir = "data"
+output_dir = file.path('wip', "data")
 username = "checchi"
 password = "2bczpsNH"
 from_date = Sys.Date() - 5
 to_date = Sys.Date()
 
-is_holiday <- function(date) {
-  feste <- c(
-    "01-01",
-    "06-01",
-    "25-04",
-    "01-05",
-    "02-06",
-    "15-08",
-    "01-11",
-    "08-12",
-    "25-12",
-    "26-12"
-  )
-
-  # Check if date is a holiday
-  formatted_date <- format(date, "%d-%m")
-  easter_date <- as.Date(Easter(year(date)))
-
-  return(formatted_date %in% feste ||
-           weekdays(date) %in% c("Saturday", "Sunday") ||
-           (easter_date + 1) == date)
-}
-
 
 # Define main function
-process_data <- function(from_date, to_date, output_dir, username, password) {
+alba_download_data = function(from_date, to_date, output_dir, username, password) {
   filename <- ""
 
     login_url <- "https://www.geeo.energy/login/?lang=it"
@@ -118,8 +95,11 @@ process_data <- function(from_date, to_date, output_dir, username, password) {
 }
 
 # Example usage
-# process_data("/work", "checchi", "2bczpsNH", Sys.Date() - 5, Sys.Date())
+process_data(
+  from_date =  Sys.Date() - 30, to_date = Sys.Date(),
+  output_dir = output_dir, "checchi", "2bczpsNH"
+)
 
 
 # Example usage
-process_data()
+# process_data()

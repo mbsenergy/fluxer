@@ -233,3 +233,67 @@ extract_xml_dam_data <- function(xml_data) {
   # Return the result
   return(result)
 }
+
+
+
+#' Check if a Date is a Holiday
+#'
+#' This function determines if a given date is a holiday based on a fixed list of holidays, weekends, 
+#' or the day after Easter.
+#'
+#' @param date A `Date` object representing the date to check.
+#'
+#' @return A logical value (`TRUE` or `FALSE`). Returns `TRUE` if the date is a holiday, otherwise `FALSE`.
+#'
+#' @details
+#' The function checks the following conditions to determine if the date is a holiday:
+#' - Fixed holidays (e.g., New Year's Day, Christmas).
+#' - Weekends (Saturday and Sunday).
+#' - The day after Easter.
+#'
+#' Fixed holidays include:
+#' - January 1st (New Year's Day)
+#' - January 6th (Epiphany)
+#' - April 25th (Liberation Day)
+#' - May 1st (Labor Day)
+#' - June 2nd (Republic Day)
+#' - August 15th (Assumption of Mary)
+#' - November 1st (All Saints' Day)
+#' - December 8th (Immaculate Conception)
+#' - December 25th (Christmas)
+#' - December 26th (St. Stephen's Day)
+#'
+#' @examples
+#' # Example 1: Check if a specific date is a holiday
+#' is_holiday(as.Date("2023-12-25")) # Christmas - should return TRUE
+#'
+#' # Example 2: Check if a weekend is a holiday
+#' is_holiday(as.Date("2023-07-15")) # Saturday - should return TRUE
+#'
+#' # Example 3: Check if a non-holiday weekday is a holiday
+#' is_holiday(as.Date("2023-07-13")) # Thursday - should return FALSE
+#'
+#' @importFrom timeDate Easter
+#' @export
+is_holiday <- function(date) {
+  feste <- c(
+    "01-01",
+    "06-01",
+    "25-04",
+    "01-05",
+    "02-06",
+    "15-08",
+    "01-11",
+    "08-12",
+    "25-12",
+    "26-12"
+  )
+
+  # Check if date is a holiday
+  formatted_date <- format(date, "%d-%m")
+  easter_date <- as.Date(Easter(year(date)))
+
+  return(formatted_date %in% feste ||
+           weekdays(date) %in% c("Saturday", "Sunday") ||
+           (easter_date + 1) == date)
+}

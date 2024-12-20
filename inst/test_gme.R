@@ -850,3 +850,101 @@ print(dt_xbid_offers)
 
 
 
+# IGI index -----------------
+
+## 45.1 Parameters ------------
+data_type <- 'IGI'
+username <- "PIASARACENO"
+password <- "18N15C9R"
+output_dir = "inst/data"
+
+
+## 4.2 Get files available at GME folder ------------
+gme_igi_files = gme_igi_get_files(data_type = data_type, output_dir = output_dir, username = username, password = password)
+
+last_n_files <- tail(gme_igi_files, 1)
+print(last_n_files)
+
+
+## 4.3 Download DATASET CLEAN------------
+
+list_igi <- lapply(last_n_files, function(file) {
+    tryCatch({
+        # Call mgp_download_file with explicit arguments
+        gme_download_igi_file(
+            filename = file,
+            data_type = data_type,
+            output_dir = output_dir,
+            username = username,       # FTP username for authentication
+            password = password,       # FTP password for authentication
+            raw = FALSE
+        )
+    }, error = function(e) {
+        # In case of an error (e.g., failed download or processing), return NULL
+        message("Error processing file: ", file, " - ", e$message)
+        return(NULL)
+    })
+})
+
+dt_igi = rbindlist(list_igi)
+print(dt_igi)
+
+
+filename = '20241223MGPGASIGI.xml'
+gme_igi_download_file <- function(filename, output_dir, username, password, raw = FALSE) {
+    
+    # Define the base URL and data type (hardcoded for IGI)
+    data_type = "IGI"
+    url_base = paste0('ftp://download.mercatoelettrico.org/MercatiGas/MGPGAS_IGI/', data_type, '/')
+    file_url <- paste0(url_base, filename)
+    
+    # Construct the output file path
+    output_file <- file.path(output_dir, filename)
+
+    # Create a curl handle for FTP download
+    h <- curl::new_handle()
+    curl::handle_setopt(h, .list = list(
+        userpwd = paste0(username, ":", password),
+        ftp_use_epsv = TRUE))  # Passive FTP mode
+
+    # Print the FTP URL for debugging
+    message("Trying to download file from: ", file_url)
+    
+    # Perform the download and process the XML file
+    result_df <- tryCatch({
+        # Download the file from the FTP server
+        curl::curl_download(file_url, output_file, handle = h)
+        message("File downloaded successfully: ", output_file)
+        
+        # Process the downloaded XML file if not in raw mode
+        if (isFALSE(raw)) {
+            # Call the function to process the downloaded IGI XML
+            result_df <- gme_igi_xml_to_data(output_file)  # The function you provided for parsing the IGI XML
+            setcolorder(result_df, c('DATE', 'TIME', 'HOUR', 'MARKET', 'ZONE', 'VARIABLE', 'VALUE', 'UNIT'))
+        } else {
+            result_df <- FALSE
+        }
+
+        result_df
+    }, error = function(e) {
+        # Handle errors in the download or processing step
+        message("Error downloading or processing file: ", filename, " - ", e$message)
+        result_df = NULL
+        result_df
+    })
+
+    if (is.null(result_df)) {
+        message("An error occurred; result_df is NULL.")
+    } else {
+        message("Processing completed successfully.")
+    }
+
+    # Optionally remove the downloaded file after processing
+    if (isFALSE(raw)) {
+        file.remove(output_file)
+        return(result_df)
+    } else {
+        message(paste("XML File saved at:", output_file))
+        return(TRUE)
+    }
+}
