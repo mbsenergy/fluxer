@@ -10,7 +10,7 @@ devtools::load_all()
 
 
 
-# PRICES:  MGP Price -----------------
+# Alba  -----------------
 
 ## 1.1 Parameters ------------
 output_dir <- file.path('wip', "data")

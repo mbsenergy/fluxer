@@ -208,9 +208,7 @@ alba_download_data_power <- function(from_date, to_date, type, output_dir, usern
 #' @import openxlsx
 #' @import magrittr
 #'
-#' @examples
-#' # Example usage:
-#' result_data <- alba_download_data_gas(from_date = Sys.Date() - 7, to_date = Sys.Date(), output_dir = "data", username = "user", password = "pass")
+#' @export
 alba_download_data_gas <- function(from_date, to_date, type, output_dir, username, password) {
   # Login and download URLs
   login_url <- "https://www.geeo.energy/login/?lang=it"

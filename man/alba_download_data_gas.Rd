@@ -37,7 +37,3 @@ This function logs into the GEEO Energy platform, retrieves the gas price data a
 processes it to extract relevant data within the specified date range, and then deletes the file
 after processing.
 }
-\examples{
-# Example usage:
-result_data <- alba_download_data_gas(from_date = Sys.Date() - 7, to_date = Sys.Date(), output_dir = "data", username = "user", password = "pass")
-}
