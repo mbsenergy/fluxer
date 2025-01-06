@@ -37,18 +37,62 @@ db_get_minmax_dates <- function(con, table_name, date_column = "DATE") {
   if (missing(con) || missing(table_name)) {
     stop("Both 'con' (database connection) and 'table_name' are required.")
   }
-  
+
   # Construct the SQL query using glue
   query <- glue('SELECT MIN("{date_column}") AS min_date, MAX("{date_column}") AS max_date FROM "{table_name}";')
-  
+
   # Execute the query
   result <- dbGetQuery(con, query)
 
   message(crayon::bgCyan(paste('DATES:', result)))
-  
+
   # Convert the result to a data.table
   result_dt <- as.data.table(result)
-  
+
   # Return the data.table
   return(result_dt)
+}
+
+
+
+#' Find Missing Dates in a Vector
+#'
+#' This function identifies the missing dates in a sequence of dates. It can optionally exclude weekends (Saturday and Sunday) from the results.
+#'
+#' @param dates A character vector of dates in "YYYY-MM-DD" format.
+#' @param full_week Logical. If `TRUE`, includes all missing dates (default). If `FALSE`, only includes missing weekdays (Monday to Friday).
+#' @return A character vector of missing dates in "YYYY-MM-DD" format.
+#' @examples
+#' # Example input vector
+#' ret_files <- c(
+#'   "2023-12-31", "2024-12-01", "2024-12-02", "2024-12-03", "2024-12-04",
+#'   "2024-12-14", "2024-12-20", "2024-12-21", "2024-12-22", "2024-12-23",
+#'   "2024-12-24", "2024-12-25", "2024-12-26", "2024-12-27", "2024-12-28",
+#'   "2024-12-29"
+#' )
+#'
+#' # Find all missing dates (full week)
+#' find_missing_dates(ret_files, full_week = TRUE)
+#'
+#' # Find only missing weekdays (Monday to Friday)
+#' find_missing_dates(ret_files, full_week = FALSE)
+#'
+#' @export
+find_missing_dates = function(dates, full_week = TRUE) {
+  # Convert the input vector to Date objects
+  date_vector = as.Date(dates)
+
+  # Generate a full sequence of dates from the minimum to the maximum
+  full_date_range = seq(min(date_vector), max(date_vector), by = "day")
+
+  # Filter missing dates
+  missing_dates = full_date_range[!full_date_range %in% date_vector]
+
+  # If full_week is FALSE, filter out weekends (Saturday and Sunday)
+  if (!full_week) {
+    missing_dates = missing_dates[!weekdays(missing_dates) %in% c("Saturday", "Sunday")]
+  }
+
+  # Return the missing dates as a character vector
+  return(as.character(missing_dates))
 }
