@@ -10,7 +10,8 @@ alba_download_data_gas(
   type,
   output_dir,
   username,
-  password
+  password,
+  raw = FALSE
 )
 }
 \arguments{

@@ -39,7 +39,7 @@ agsi_gas_data <- function(country, from_date, to_date, api_key = Sys.getenv('AGS
   res <- GET(url_s, add_headers(`x-key` = api_key))
 
   if (status_code(res) != 200) {
-    warning(sprintf("Failed to fetch data for country %s", country))
+    warning(sprintf(crayon::red("[ERROR] Failed to fetch data for country %s", country)))
     return(dtw)
   }
 
@@ -52,7 +52,7 @@ agsi_gas_data <- function(country, from_date, to_date, api_key = Sys.getenv('AGS
     res <- GET(url_s_page, add_headers(`x-key` = api_key))
 
     if (status_code(res) != 200) {
-      warning(sprintf("Failed to fetch data for country %s on page %d", country, i))
+      warning(sprintf(crayon::red("[ERROR] Failed to fetch data for country %s on page %d", country, i)))
       next
     }
 
@@ -69,6 +69,9 @@ agsi_gas_data <- function(country, from_date, to_date, api_key = Sys.getenv('AGS
   dtw[, DATE := gasDayStart]
   setnames(dtw, 'code', 'CODE_2')
   dts = melt(dtw, id.vars = c('CODE_2', 'DATE'), variable.name = 'VARIABLE', variable.factor = FALSE, value.name = 'VALUE')
+
+  message(crayon::green('[OK] File successfully processed.'))
+
   return(dts)
 }
 
@@ -125,7 +128,7 @@ agsi_gas_data <- function(country, from_date, to_date, api_key = Sys.getenv('AGS
 #' combined_data <- result$combined_data
 #' }
 #' @export
-alba_download_data_power <- function(from_date, to_date, type, output_dir, username, password) {
+alba_download_data_power <- function(from_date, to_date, type, output_dir, username, password, raw = FALSE) {
   # Login and download URLs
   login_url <- "https://www.geeo.energy/login/?lang=it"
   ajax_url <- "https://www.geeo.energy/wp-admin/admin-ajax.php"
@@ -169,18 +172,26 @@ alba_download_data_power <- function(from_date, to_date, type, output_dir, usern
 
   # Write the downloaded file to the specified directory
   writeBin(content(download_response, "raw"), file_path)
-  print(paste("File saved:", file_path))
 
-  # Process the downloaded file
-  result_data <- process_alba_xlsx(file_path, from_date, to_date, type = "electricity")
+  if(isFALSE(raw)) {
 
-  # Delete the file after processing
-  file.remove(file_path)
-  print(paste("File deleted:", file_path))
+    # Process the downloaded file
+    result_data <- process_alba_xlsx(file_path, from_date, to_date, type = "electricity")
 
-  # Return the processed data
-  return(result_data)
-}
+    # Delete the file after processing
+    file.remove(file_path)
+    message(paste(crayon::green("[OK] File succesfully processed")))
+
+    # Return the processed data
+    return(result_data)
+    
+  } else {
+
+    message(paste(crayon::green("[OK] File saved:", file_path)))
+    return(TRUE)
+
+  }
+  }
 
 #' Download and process gas price data from GEEO Energy
 #'
@@ -209,7 +220,7 @@ alba_download_data_power <- function(from_date, to_date, type, output_dir, usern
 #' @import magrittr
 #'
 #' @export
-alba_download_data_gas <- function(from_date, to_date, type, output_dir, username, password) {
+alba_download_data_gas <- function(from_date, to_date, type, output_dir, username, password, raw = FALSE) {
   # Login and download URLs
   login_url <- "https://www.geeo.energy/login/?lang=it"
   ajax_url <- "https://www.geeo.energy/wp-admin/admin-ajax.php"
@@ -253,17 +264,26 @@ alba_download_data_gas <- function(from_date, to_date, type, output_dir, usernam
 
   # Write the downloaded file to the specified directory
   writeBin(content(download_response, "raw"), file_path)
-  print(paste("File saved:", file_path))
 
-  # Process the downloaded file
-  result_data <- process_alba_xlsx(file_path, from_date, to_date, type = "gas")
+  if(isFALSE(raw)) {
+    # Process the downloaded file
+    result_data <- process_alba_xlsx(file_path, from_date, to_date, type = "gas")
 
-  # Delete the file after processing
-  file.remove(file_path)
-  print(paste("File deleted:", file_path))
+    # Delete the file after processing
+    file.remove(file_path)
 
-  # Return the processed data
-  return(result_data)
+    message(paste(crayon::green("[OK] File succesfully processed")))
+
+    # Return the processed data
+    return(result_data)
+    
+  } else {
+
+    message(paste(crayon::green("[OK] File saved:", file_path)))
+    return(TRUE)
+
+  }
+
 }
 
 #' Process Excel file and extract relevant data
@@ -304,9 +324,9 @@ alba_download_data_gas <- function(from_date, to_date, type, output_dir, usernam
 #' type <- "electricity"
 #' processed_data <- process_xlsx(filename, from_date, to_date, type)
 process_alba_xlsx <- function(filename, from_date, to_date, type) {
-  print("Opening file...")
+  message(crayon::green("Opening file..."))
   sheets <- getSheetNames(filename)
-  print("File opened!")
+  message(crayon::green("[OK] File opened!"))
   
   # Initialize an empty list to store the data tables for each sheet
   result_list <- list()
@@ -323,7 +343,7 @@ process_alba_xlsx <- function(filename, from_date, to_date, type) {
   
   for (sheet_name in sheets) {
     if (sheet_name %in% relevant_sheets) {
-      print(paste("Processing sheet:", sheet_name))
+      message(paste(crayon::green("Processing sheet:", sheet_name)))
       data <- read.xlsx(filename, sheet = sheet_name, startRow = 2, detectDates = TRUE)
       setDT(data)
       
@@ -348,10 +368,9 @@ process_alba_xlsx <- function(filename, from_date, to_date, type) {
         result_list[[sheet_name]] <- melted_data
         
         # Print a preview of the sheet's processed data
-        print(paste("Finished processing sheet:", sheet_name))
         print(head(melted_data))  # Replace with actual save logic if needed
       } else {
-        print(paste("No relevant data found in sheet:", sheet_name))
+        message(paste(crayon::yellow("[WARNING] No relevant data found in sheet:", sheet_name)))
       }
     }
   }
@@ -360,7 +379,6 @@ process_alba_xlsx <- function(filename, from_date, to_date, type) {
   combined_data <- rbindlist(result_list, use.names = TRUE, fill = TRUE)
   
   # Return the combined data.table
-  print("All processing complete.")
   setnames(combined_data, old = c('Data', 'header', 'value', 'comb'), new = c('DATE', 'VARIABLE', 'VALUE', 'TYPE'))
   setcolorder(combined_data, c('DATE', 'TYPE', 'VARIABLE', 'VALUE')) 
   

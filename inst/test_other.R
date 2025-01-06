@@ -13,7 +13,7 @@ devtools::load_all()
 # Alba  -----------------
 
 ## 1.1 Parameters ------------
-output_dir <- file.path('wip', "data")
+output_dir <- file.path('inst', "data")
 username <- "checchi"
 password <- "2bczpsNH"
 from_date <- Sys.Date() - 5

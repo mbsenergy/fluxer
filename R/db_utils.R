@@ -43,6 +43,8 @@ db_get_minmax_dates <- function(con, table_name, date_column = "DATE") {
   
   # Execute the query
   result <- dbGetQuery(con, query)
+
+  message(crayon::bgCyan(paste('DATES:', result)))
   
   # Convert the result to a data.table
   result_dt <- as.data.table(result)

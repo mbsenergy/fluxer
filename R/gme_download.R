@@ -58,13 +58,13 @@ gme_mgp_get_files <- function(data_type, output_dir = "data",
 
         # Print available files
         if(isTRUE(verbose)) {
-            message("Available files:")
+            message(crayon::green("Available files:"))
             print(files)
         }
-        message("[OK] Available files download.")
+        message(crayon::green("[OK] Available files download."))
         return(files)
     }, error = function(e) {
-        message("[ERROR] Error downloading filenames from GME directory", e$message)
+        message(crayon::red("[ERROR] Error downloading filenames from GME directory", e$message))
         return(NULL)
     })
     return(files)
@@ -110,6 +110,11 @@ mgp_download_file <- function(filename, data_type = 'MGP_Prezzi', output_dir, us
         stop(paste("Invalid data_type:", data_type,
                    ". Must be one of:", paste(allowed_data_types, collapse = ", ")))
     }
+
+    # Validate filename
+    validated_filename = gme_validate_filename(filename = filename, num_digits = 8, file_extension = "xml")
+    if(isTRUE(validated_filename)) {
+
     # Construct the file URL
 
     url_base = paste0('ftp://download.mercatoelettrico.org/MercatiElettrici/', data_type, '/')
@@ -130,7 +135,7 @@ mgp_download_file <- function(filename, data_type = 'MGP_Prezzi', output_dir, us
         curl::curl_download(file_url, output_file, handle = h)
 
         # Check if the download was successful
-        message("File downloaded successfully: ", output_file)
+        message(crayon::green("File downloaded successfully: ", output_file))
 
         # Process the downloaded XML file
         if (isFALSE(raw)) {
@@ -166,23 +171,27 @@ mgp_download_file <- function(filename, data_type = 'MGP_Prezzi', output_dir, us
         result_df
     }, error = function(e) {
         # Handle errors (e.g., failed download or XML processing)
-        message("Error downloading file: ", filename, " - ", e$message)
+        message(crayon::red("[ERROR] Error downloading file: ", filename, " - ", e$message))
         result_df = NULL
         result_df
     })
 
     if (is.null(result_df)) {
-        message("An error occurred; result_df is NULL.")
+        message(crayon::red("[ERROR] An error occurred; result_df is NULL."))
     } else {
-        message("Processing completed successfully.")
+        message(crayon::green("[OK] Processing completed successfully."))
     }
 
     if(isFALSE(raw)) {
         file.remove(output_file)
         return(result_df)
     } else {
-        message(paste("XML File at:", output_file))
+        message(paste(crayon::green("[OK] XML File at:", output_file)))
         return(TRUE)
+    }
+        
+    } else {
+        message(crayon::red("[ERROR] Wrong Filename"))
     }
 }
 
@@ -267,7 +276,7 @@ gme_dam_price_xml_to_data <- function(xml_file_path) {
     data_df[, Data := as.Date(Data, format = "%Y%m%d")]
     data_df[, TIME := paste0(sprintf("%02d", as.numeric(Ora)), ":00")]
     setnames(data_df, c('Data', 'Mercato', 'Ora'), c('DATE', 'MARKET', 'HOUR'))
-    data_df_lg <- melt(data_df, id.vars = c('DATE', 'TIME', 'HOUR', 'MARKET'), variable.name = 'ZONE', value.name = 'VALUE')
+    data_df_lg <- melt(data_df, id.vars = c('DATE', 'TIME', 'HOUR', 'MARKET'), variable.factor = FALSE, variable.name = 'ZONE', value.name = 'VALUE')
     data_df_lg[, VALUE := as.numeric(gsub(",", ".", VALUE))]
     data_df_lg[, UNIT := 'EUR']
 
@@ -360,7 +369,8 @@ gme_dam_quantity_xml_to_data <- function(xml_file_path) {
 
     # Reshape the data to long format
     data_dt_long <- melt(data_dt, id.vars = c("DATE", "MARKET", "HOUR"),
-                         variable.name = "ZONE", value.name = "VALUE")
+                         variable.name = "ZONE", value.name = "VALUE",
+                        variable.factor = FALSE)
 
     # Convert DATE and HOUR to proper formats
     data_dt_long[, DATE := as.Date(DATE, format = "%Y%m%d")]
@@ -447,7 +457,7 @@ gme_dam_fabb_xml_to_data <- function(xml_file_path) {
     data_df[, Data := as.Date(Data, format = "%Y%m%d")]
     data_df[, TIME := paste0(sprintf("%02d", as.numeric(Ora)), ":00")]
     setnames(data_df, c('Data', 'Mercato', 'Ora'), c('DATE', 'MARKET', 'HOUR'))
-    data_df_lg <- melt(data_df, id.vars = c('DATE', 'TIME', 'HOUR', 'MARKET'), variable.name = 'ZONE', value.name = 'VALUE')
+    data_df_lg <- melt(data_df, id.vars = c('DATE', 'TIME', 'HOUR', 'MARKET'), variable.factor = FALSE, variable.name = 'ZONE', value.name = 'VALUE')
     data_df_lg[, VALUE := as.numeric(gsub(",", ".", VALUE))]
     data_df_lg[, UNIT := 'MWh']
 
@@ -515,7 +525,7 @@ gme_dam_liq_xml_to_data <- function(xml_file_path) {
     data_df[, Data := as.Date(Data, format = "%Y%m%d")]
     data_df[, TIME := paste0(sprintf("%02d", as.numeric(Ora)), ":00")]
     setnames(data_df, c('Data', 'Mercato', 'Ora'), c('DATE', 'MARKET', 'HOUR'))
-    data_df_lg <- melt(data_df, id.vars = c('DATE', 'TIME', 'HOUR', 'MARKET'), variable.name = 'ZONE', value.name = 'VALUE')
+    data_df_lg <- melt(data_df, id.vars = c('DATE', 'TIME', 'HOUR', 'MARKET'), variable.factor = FALSE, variable.name = 'ZONE', value.name = 'VALUE')
     data_df_lg[, VALUE := as.numeric(gsub(",", ".", VALUE))]
     data_df_lg[, UNIT := 'MWh']
 
@@ -591,6 +601,7 @@ gme_dam_tran_xml_to_data <- function(xml_file_path) {
         data_df,
         id.vars = c("DATE", "MARKET", "HOUR", 'VALUE'),
         measure.vars = c("Da", "A"),
+        variable.factor = FALSE,
         variable.name = "Type",
         value.name = "ZONE"
     )
@@ -673,6 +684,7 @@ gme_dam_limtran_xml_to_data <- function(xml_file_path) {
         data_df,
         id.vars = c("DATE", "MARKET", "HOUR", "Limite", "Coefficiente"),
         measure.vars = c("Da", "A"),
+        variable.factor = FALSE,
         variable.name = "Type",
         value.name = "ZONE"
     )
@@ -682,6 +694,7 @@ gme_dam_limtran_xml_to_data <- function(xml_file_path) {
         melted_data,
         id.vars = c("DATE", "MARKET", "HOUR", "ZONE"),
         measure.vars = c("Limite", "Coefficiente"),
+        variable.factor = FALSE,
         variable.name = "VARIABLE",
         value.name = "VALUE"
     )
@@ -699,7 +712,6 @@ gme_dam_limtran_xml_to_data <- function(xml_file_path) {
 # OTHER MARKETS ------------------------------------------------------------------------------------------------------
 
 ## MSD ------------------------------------------------------------------------------------------------------
-
 
 
 #' Retrieve Files from GME FTP Server for Other markets
@@ -759,13 +771,13 @@ gme_rest_get_files <- function(data_type, output_dir = "data",
 
         # Print available files
         if(isTRUE(verbose)) {
-            message("Available files:")
+            message(crayon::green("[OK] Available files:"))
             print(files)
         }
-        message("[OK] Available files download.")
+        message(crayon::green("[OK] Available files download."))
         return(files)
     }, error = function(e) {
-        message("[ERROR] Error downloading filenames from GME directory", e$message)
+        message(crayon::red("[ERROR] Error downloading filenames from GME directory", e$message))
         return(NULL)
     })
     return(files)
@@ -814,6 +826,10 @@ gme_other_download_file <- function(filename, data_type = 'MSD_ServiziDispacciam
                    ". Must be one of:", paste(allowed_data_types, collapse = ", ")))
     }
 
+    # Validate filename
+    validated_filename = gme_validate_filename(filename = filename, num_digits = 8, file_extension = "xml")
+    if(isTRUE(validated_filename)) {    
+
     url_base = paste0('ftp://download.mercatoelettrico.org/MercatiElettrici/', data_type, '/')
     file_url <- paste0(url_base, filename)
 
@@ -832,7 +848,7 @@ gme_other_download_file <- function(filename, data_type = 'MSD_ServiziDispacciam
         curl::curl_download(file_url, output_file, handle = h)
 
         # Check if the download was successful
-        message("File downloaded successfully: ", output_file)
+        message(crayon::green("File downloaded successfully: ", output_file))
 
 
         # Process the downloaded XML file
@@ -865,24 +881,29 @@ gme_other_download_file <- function(filename, data_type = 'MSD_ServiziDispacciam
         result_df
     }, error = function(e) {
         # Handle errors (e.g., failed download or XML processing)
-        message("Error downloading file: ", filename, " - ", e$message)
+        message(crayon::red("[ERROR] Error downloading file: ", filename, " - ", e$message))
         result_df = NULL
         result_df
     })
 
     if (is.null(result_df)) {
-        message("An error occurred; result_df is NULL.")
+        message(crayon::red("[ERROR] An error occurred; result_df is NULL."))
     } else {
-        message("Processing completed successfully.")
+        message(crayon::green("[OK] Processing completed successfully."))
     }
 
     if(isFALSE(raw)) {
         file.remove(output_file)
         return(result_df)
     } else {
-        message(paste("XML File at:", output_file))
+        message(paste(crayon::green("[OK] XML File at:", output_file)))
         return(TRUE)
     }
+
+    } else {
+        message(crayon::red("[ERROR] Wrong Filename"))
+    }
+        
 }
 
 
@@ -1476,13 +1497,13 @@ gme_offers_get_files <- function(data_type, output_dir = "data",
 
         # Print available files
         if(isTRUE(verbose)) {
-            message("Available files:")
+            message(crayon::green("Available files:"))
             print(files)
         }
-        message("[OK] Available files download.")
+        message(crayon::green("[OK] Available files download."))
         return(files)
     }, error = function(e) {
-        message("[ERROR] Error downloading filenames from GME directory", e$message)
+        message(crayon::red("[ERROR] Error downloading filenames from GME directory", e$message))
         return(NULL)
     })
     return(files)
@@ -1528,6 +1549,10 @@ gme_download_offers_file <- function(filename, data_type = 'MGP', output_dir, us
         stop(paste("Invalid data_type:", data_type, ". Must be one of:", paste(allowed_data_types, collapse = ", ")))
     }
 
+    # Validate filename
+    validated_filename = gme_validate_filename(filename = filename, num_digits = 8, file_extension = "zip")
+    if(isTRUE(validated_filename)) {
+        
     # Construct the file URL
     mkt_data_type <- paste0(data_type, '_OffertePubbliche/')
     url_base <- paste0('ftp://download.mercatoelettrico.org/MercatiElettrici/', mkt_data_type)
@@ -1547,7 +1572,7 @@ gme_download_offers_file <- function(filename, data_type = 'MGP', output_dir, us
     result_df <- tryCatch({
         # Download the file
         curl::curl_download(file_url, output_file, handle = h)
-        message("File downloaded successfully: ", output_file)
+        message(crayon::green("File downloaded successfully: ", output_file))
 
         # Check if the downloaded file is a zip
         if (!grepl("\\.zip$", filename)) {
@@ -1575,29 +1600,32 @@ gme_download_offers_file <- function(filename, data_type = 'MGP', output_dir, us
         if (!raw) {
                 result_df <- gme_offerts_zip_to_data(xml_file_name)
         } else {
-            message("Raw mode: Skipping processing of XML file.")
+            message(glue::yellow("Raw mode: Skipping processing of XML file."))
             result_df <- NULL
         }
 
         result_df
     }, error = function(e) {
         # Handle errors
-        message("Error occurred: ", e$message)
+        message(crayon::red("[ERROR] Error occurred: ", e$message))
         NULL
     })
 
     # Cleanup and return results
     if (!raw && !is.null(result_df)) {
-        message("Cleaning up intermediate files.")
+        message(crayon::green("Cleaning up intermediate files."))
         file.remove(xml_file_name)
     } else if (raw) {
-        message(paste("Raw XML file available at:", xml_file_name))
+        message(paste(crayon::green("[OK] Raw XML file available at:", xml_file_name)))
     }
 
     return(result_df)
+        
+    } else {
+        message(crayon::red("[ERROR] Wrong Filename"))
+    }
+    
 }
-
-
 
 
 # Define the function
@@ -1674,7 +1702,7 @@ gme_offerts_zip_to_data <- function(xml_file_path) {
 }
 
 
-# MGP ------------------------------------------------------------------------------------------------------
+# IGI ------------------------------------------------------------------------------------------------------
 
 #' Retrieve Files from GME FTP Server for DAM market
 #'
@@ -1708,6 +1736,10 @@ gme_igi_get_files <- function(data_type, output_dir = "data",
                    ". Must be one of:", paste(allowed_data_types, collapse = ", ")))
     }
 
+    # # Validate filename
+    # validated_filename = gme_validate_filename(filename = filename, num_digits = 8, file_extension = "xml")
+    # if(isTRUE(validated_filename)) {
+        
     url_base = paste0('ftp://download.mercatoelettrico.org/MercatiGas/MGPGAS_IGI//', data_type, '/')
 
     if (data_type == "IGI") {file_pattern = "\\S+IGI\\.xml$"}
@@ -1724,7 +1756,7 @@ gme_igi_get_files <- function(data_type, output_dir = "data",
         file_list <- system(ftp_list_cmd, intern = TRUE)
 
         # Print the list of files and directories in the FTP directory
-        message("Listing files and directories on FTP server:")
+        message(crayon::green("[OK] Listing files and directories on FTP server:"))
         print(file_list)
 
         # Match files based on the pattern (files that end with 'IGI.xml')
@@ -1733,12 +1765,56 @@ gme_igi_get_files <- function(data_type, output_dir = "data",
         files_to_download <- files[nzchar(files)]  # Filter out empty matches
 
         if(isTRUE(verbose)) {
-            message("Available files:")
+            message(crayon::green("[OK] Available files:"))
             print(files_to_download)
         }
     }, error = function(e) {
-        message("[ERROR] Error downloading files from FTP server", e$message)
+        message(crayon::red("[ERROR] Error downloading files from FTP server", e$message))
         return(NULL)
     })
+        
     return(files_to_download)
+    
+    # } else {
+    #     message(crayon::red("[ERROR] Wrong Filename"))
+    # }
+    
 }
+ 
+ 
+ #' Validate Filename Structure
+#'
+#' This function checks whether a given filename matches a specific structure based on 
+#' the number of leading digits, a middle expression, and the file extension.
+#'
+#' @param filename A string representing the filename to validate.
+#' @param num_digits An integer specifying the number of leading digits in the filename. Default is 8.
+#' @param middle_expression A string specifying the exact middle expression in the filename. Default is "MGPPrezzi".
+#' @param file_extension A string specifying the expected file extension (without the dot). Default is "xml".
+#'
+#' @return A logical value (`TRUE` if the filename is valid, `FALSE` otherwise).
+#'         If the filename is invalid, it prints "Wrong filename" to the console.
+#'
+#' @examples
+#' # Validate a correctly formatted filename
+#' gme_validate_filename("20241126MGPPrezzi.xml") # Returns TRUE
+#'
+#' # Validate an incorrectly formatted filename
+#' gme_validate_filename("wrongfile.xml") # Prints "Wrong filename" and returns FALSE
+#'
+#' # Validate with custom parameters
+#' gme_validate_filename("2024MGPPrezzi.txt", num_digits = 4, file_extension = "txt") # Returns TRUE
+#'
+#' @export
+gme_validate_filename = function(filename, num_digits = 8, file_extension = "xml") {
+    # Build the regular expression dynamically
+    pattern = paste0("^\\d{", num_digits, "}.*\\.", file_extension, "$")
+    
+    if (!grepl(pattern, filename)) {
+        cat(crayon::red("Wrong filename", "\n"))
+        return(FALSE)
+    }
+    return(TRUE)
+}
+  
+  

@@ -684,7 +684,7 @@ print(dt_xbid_all)
 # OFFERS: MGP -----------------
 
 ## 1.1 Parameters ------------
-n <- 1
+n <- 2
 
 data_type <- 'MGP'
 username <- "PIASARACENO"
