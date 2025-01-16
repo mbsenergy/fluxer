@@ -1,7 +1,7 @@
 Package: fluxer
 Type: Package
 Title: FLUX collection of functions and utilities
-Version: 0.5.1
+Version: 0.5.2
 Authors@R: 
     person(given = "Alejandro", 
            family = "Abraham", 
@@ -14,7 +14,9 @@ LazyData: true
 Roxygen: list(markdown = TRUE)
 Imports: 
     data.table,
+    magrittr,
     DBI,
+    RPostgres,
     htmltools,
     httr,
     curl,
@@ -23,11 +25,11 @@ Imports:
     crayon,
     glue,
     tidyjson,
-    magrittr
+    timeDate,
+    rvest
 Suggests:
     roxygen2,
     devtools,
-    duckdb,
     usethis
 RoxygenNote: 7.3.2
 Depends: 
