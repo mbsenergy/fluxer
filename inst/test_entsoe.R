@@ -1,6 +1,7 @@
 
 box::use(data.table[...])
 box::use(magrittr[...])
+box::use(ggplot2[...])
 devtools::load_all()
 
 
@@ -9,12 +10,15 @@ devtools::load_all()
 ## DAM Prices ----------------------
 
 country <- "Italy (North)"
-from_data <- Sys.Date() - 30
-to_data <- Sys.Date()
-api_key = Sys.getenv('ENTSOE_KEY')
+from_data <- Sys.Date() - 180
+to_data <- Sys.Date()-30
+# api_key = Sys.getenv('ENTSOE_KEY')
+api_key = ''
 
-dam_prices <- entsoe_dam_prices(country, from_data, to_data, api_key = Sys.getenv('ENTSOE_KEY'))
-dam_prices %>% head()
+dam_prices <- entsoe_dam_prices(country, from_data, to_data, verbose = TRUE, plot = TRUE)
+# dam_prices %>% head()
+dam_prices
+
 
 # con_df = parse_ftp_links(con)
 # con_df

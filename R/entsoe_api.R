@@ -35,7 +35,147 @@
 #' print(dam_prices)
 #'
 #' @export
-entsoe_dam_prices = function(country, from_data, to_data, api_key = Sys.getenv('ENTSOE_KEY')) {
+#'
+#'
+#' @title
+#' Retrieve Day-Ahead Market Prices for a Specific Country
+#'
+#' @description
+#' This function retrieves Day-Ahead Market (DAM) prices for a specific country from the ENTSOE Transparency Platform API.
+#' The function fetches market price data for a given time range and country, processes the data, and formats it into a `data.table`.
+#'
+#' @param country A character string specifying the country for which to retrieve DAM prices. The country should match an entry in the `entsoe_countries` table.
+#' @param from_data A Date object specifying the start date for the data range. Default is 365 days before the current date.
+#' @param to_data A Date object specifying the end date for the data range. Default is the current date.
+#' @param api_key A character string containing the ENTSOE API key. It can be passed directly or retrieved from the environment variable `ENTSOE_KEY`.
+#'
+#' @return
+#' A `data.table` containing the formatted DAM price data for the specified country and time range. The data table includes:
+#' \itemize{
+#'   \item `DATE`: The date in `YYYY-MM-DD` format.
+#'   \item `HOUR`: The hour of the day (position in the data).
+#'   \item `VALUE`: The price value in EUR.
+#'   \item `UNIT`: The unit of the price (always 'EUR').
+#' }
+#'
+#' @import data.table
+#' @import magrittr
+#' @import xml2
+#' @import httr
+#' @import glue
+#' @import crayon
+#' @import lubridate
+#' @import ggplot2
+#'
+#' @examples
+#' # Example usage to retrieve DAM prices for Italy (North)
+#' country <- "Italy (North)"
+#' from_data <- Sys.Date() - 365
+#' to_data <- Sys.Date()
+#' dam_prices <- entsoe_dam_prices(country, from_data, to_data, api_key = Sys.getenv('ENTSOE_KEY'))
+#' print(dam_prices)
+#' @export
+#'
+entsoe_dam_prices = function(country, from_data, to_data, api_key = Sys.getenv('ENTSOE_KEY'), verbose=FALSE, plot=FALSE) {
+
+    if (identical(api_key, "")) {
+        cat(yellow("Warning: Missing API key! Please set 'ENTSOE_KEY' in your environment.\n"))
+    }
+
+    if (is.character(from_data)) from_data <- as.Date(from_data)
+    if (is.character(to_data)) to_data <- as.Date(to_data)
+
+    # Check again to ensure both are now Dates
+    if (!inherits(from_data, "Date") | !inherits(to_data, "Date")) {
+        stop("Error: Both 'from_data' and 'to_data' must be of class Date or convertible to Date.")
+    }
+
+    from_data <- from_data %>% as.Date()
+    to_data <- to_data %>% as.Date()
+
+    # Generate a sequence of months from start to end
+    # Generate a sequence of months from start to end
+    month_starts <- seq(from_data, to_data, by = "month")
+    month_starts[1] <- as.Date(paste0(year(month_starts[1]), "-", month(month_starts[1]), "-01"))
+    month_starts[-1] <- as.Date(paste0(year(month_starts[-1]), "-", month(month_starts[-1]), "-01"))
+    month_ends <- as.Date(pmin(lubridate::ceiling_date(month_starts, "month") - 1, to_data))
+
+    # Create data.table
+    dt_dates <- data.table(FROM = month_starts, TO = month_ends)
+
+    if (dt_dates[nrow(dt_dates), TO] != to_data) {
+
+        last_full_month_end <- as.Date(pmin(lubridate::ceiling_date(month_starts[nrow(dt_dates)], "month") - 1, to_data))
+        new_row <- data.table(FROM = last_full_month_end + 1, TO = to_data)
+        dt_dates[nrow(dt_dates), TO := last_full_month_end]
+        dt_dates <- rbind(dt_dates, new_row)
+    }
+
+    results <- lapply(1:nrow(dt_dates), function(i) {
+        api_entsoe_dam_prices(country, dt_dates$FROM[i], dt_dates$TO[i], api_key)
+    })
+
+    # If entsoe_api returns a data.frame or list, you can combine results:
+    results_combined <- rbindlist(results, fill = TRUE)
+    results_combined[, DATETIME := as.POSIXct(paste(DATE, HOUR), format = "%Y-%m-%d %H")]
+    setorder(results_combined, DATETIME)
+
+
+    if(isTRUE(verbose)) {
+        print(results_combined)
+    }
+
+    if(isTRUE(plot)) {
+
+        P1 =
+        ggplot2::ggplot(results_combined, aes(x = DATETIME, y = VALUE, color = COUNTRY)) +
+            ggplot2::geom_line() +
+            ggplot2::geom_point() +
+            labs(title = "Electricity Data Over Time",
+                 x = "Datetime",
+                 y = "Value") +
+            ggplot2::theme_minimal()
+
+        print(P1)
+
+    }
+
+
+    return(results_combined)
+
+}
+
+
+
+#' @title
+#' INTERNAL - API Retrieve Day-Ahead Market Prices for a Specific Country
+#'
+#' @description
+#' This function retrieves Day-Ahead Market (DAM) prices for a specific country from the ENTSOE Transparency Platform API.
+#' The function fetches market price data for a given time range and country, processes the data, and formats it into a `data.table`.
+#'
+#' @param country A character string specifying the country for which to retrieve DAM prices. The country should match an entry in the `entsoe_countries` table.
+#' @param from_data A Date object specifying the start date for the data range. Default is 365 days before the current date.
+#' @param to_data A Date object specifying the end date for the data range. Default is the current date.
+#' @param api_key A character string containing the ENTSOE API key. It can be passed directly or retrieved from the environment variable `ENTSOE_KEY`.
+#'
+#' @return
+#' A `data.table` containing the formatted DAM price data for the specified country and time range. The data table includes:
+#' \itemize{
+#'   \item `DATE`: The date in `YYYY-MM-DD` format.
+#'   \item `HOUR`: The hour of the day (position in the data).
+#'   \item `VALUE`: The price value in EUR.
+#'   \item `UNIT`: The unit of the price (always 'EUR').
+#' }
+#'
+#' @import data.table
+#' @import magrittr
+#' @import xml2
+#' @import httr
+#' @import glue
+#' @import crayon
+#'
+api_entsoe_dam_prices = function(country, from_data, to_data, api_key = Sys.getenv('ENTSOE_KEY')) {
 
   # Translate the country to the EIC code using the entsoe_countries mapping
   entsoe_domain = entsoe_countries[CODE_ENTSOE == country]$CODE_EIC
