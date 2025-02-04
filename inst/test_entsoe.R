@@ -57,7 +57,9 @@ dts_2 %>% head()
 
 ## entsoe_get_file ----------------------
 
-dts_3 = entsoe_download_file(basis_name = 'AggregatedGenerationPerType_16.1.B_C', year = 2024, month = 10, output_file = 'prova.csv')
+dts_3 = entsoe_download_file(basis_name = 'EnergyPrices_12.1.D_r3', year = 2024, month = 01, output_file = 'prova.csv')
+
+dts = fread('prova.csv')
 
 # basis_name = 'DayAheadPrices_12.1.D'
 # year = lubridate::year(Sys.Date())
