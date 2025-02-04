@@ -93,6 +93,10 @@ entsoe_dam_prices = function(country, from_data, to_data, api_key = Sys.getenv('
     from_data <- from_data %>% as.Date()
     to_data <- to_data %>% as.Date()
 
+    if (to_data - from_data < months(1)) {
+      stop("Error: The difference between start_date and to_date is less than a month!")
+    }
+
     # Generate a sequence of months from start to end
     # Generate a sequence of months from start to end
     month_starts <- seq(from_data, to_data, by = "month")
@@ -174,6 +178,7 @@ entsoe_dam_prices = function(country, from_data, to_data, api_key = Sys.getenv('
 #' @import httr
 #' @import glue
 #' @import crayon
+#' @export
 #'
 api_entsoe_dam_prices = function(country, from_data, to_data, api_key = Sys.getenv('ENTSOE_KEY')) {
 
@@ -181,7 +186,7 @@ api_entsoe_dam_prices = function(country, from_data, to_data, api_key = Sys.gete
   entsoe_domain = entsoe_countries[CODE_ENTSOE == country]$CODE_EIC
 
   # Format the start and end period times for the API request
-  period_start <- paste0(format(as.Date(from_data), "%Y%m%d"), "0000")
+  period_start <- paste0(format(as.Date(from_data) - 1, "%Y%m%d"), "2300")
   period_end <- paste0(format(as.Date(to_data), "%Y%m%d"), "2300")
 
   # Construct the full URL with query parameters
@@ -217,6 +222,10 @@ api_entsoe_dam_prices = function(country, from_data, to_data, api_key = Sys.gete
                   HOUR = Position, RESOLUTION = Resolution, VALUE = Price, UNIT = 'EUR')]
 
   DT = merge(DT, entsoe_countries[, .(COUNTRY, CODE_ENTSOE)], by = 'CODE_ENTSOE', all.x = TRUE)
+
+  full_hours = DT[, .(HOUR = 1:24), by = .(COUNTRY, CODE_ENTSOE, DATE, RESOLUTION, UNIT)]
+  DT = merge(full_hours, DT, by = c('COUNTRY', 'CODE_ENTSOE', 'DATE', 'HOUR', 'RESOLUTION', 'UNIT'), all.x = TRUE)
+  DT[, VALUE := zoo::na.locf(VALUE, na.rm = FALSE), by = .(COUNTRY, CODE_ENTSOE, DATE)]
 
   setcolorder(DT, neworder = c('COUNTRY', 'CODE_ENTSOE', 'DATE', 'HOUR', 'RESOLUTION', 'VALUE', 'UNIT'))
 

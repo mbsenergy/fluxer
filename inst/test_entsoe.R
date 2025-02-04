@@ -7,13 +7,25 @@ devtools::load_all()
 
 # 1. API Method ---------------------------------------------
 
+## DAM Prices RAW ----------------------
+
+country <- "Spain"
+from_data <- '2024-01-04'
+to_data <- '2024-01-08'
+# api_key = Sys.getenv('ENTSOE_KEY')
+# api_key = ''
+
+dam_prices <- api_entsoe_dam_prices(country, from_data, to_data)
+# dam_prices %>% head()
+dam_prices
+
 ## DAM Prices ----------------------
 
-country <- "Italy (North)"
-from_data <- Sys.Date() - 180
-to_data <- Sys.Date()-30
+country <- "Spain"
+from_data <- '2024-01-04'
+to_data <- '2024-02-08'
 # api_key = Sys.getenv('ENTSOE_KEY')
-api_key = ''
+# api_key = ''
 
 dam_prices <- entsoe_dam_prices(country, from_data, to_data, verbose = TRUE, plot = TRUE)
 # dam_prices %>% head()
