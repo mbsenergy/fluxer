@@ -2,7 +2,8 @@
 box::use(data.table[...])
 box::use(magrittr[...])
 box::use(ggplot2[...])
-devtools::load_all()
+# devtools::load_all()
+box::use(fluxer[...])
 
 
 # 1. API Method ---------------------------------------------
@@ -11,7 +12,7 @@ devtools::load_all()
 
 country <- "Spain"
 from_data <- '2024-01-04'
-to_data <- '2024-01-08'
+to_data <- '2024-01-06'
 # api_key = Sys.getenv('ENTSOE_KEY')
 # api_key = ''
 

@@ -3,6 +3,7 @@
 export(agsi_gas_data)
 export(alba_download_data_gas)
 export(alba_download_data_power)
+export(api_entsoe_dam_prices)
 export(api_req)
 export(db_get_minmax_dates)
 export(entsoe_actual_generation)
