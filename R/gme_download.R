@@ -189,7 +189,7 @@ mgp_download_file <- function(filename, data_type = 'MGP_Prezzi', output_dir, us
         message(paste(crayon::green("[OK] XML File at:", output_file)))
         return(TRUE)
     }
-        
+
     } else {
         message(crayon::red("[ERROR] Wrong Filename"))
     }
@@ -595,12 +595,13 @@ gme_dam_tran_xml_to_data <- function(xml_file_path) {
     data_df[, Data := as.Date(Data, format = "%Y%m%d")]
     data_df[, Da := paste0('from_', Da)]
     data_df[, A := paste0('to_', A)]
+    data_df[, DAA := paste(Da, A, sep = '-')]
     setnames(data_df, c('Data', 'Mercato', 'Ora'), c('DATE', 'MARKET', 'HOUR'))
 
     melted_data = melt(
         data_df,
         id.vars = c("DATE", "MARKET", "HOUR", 'VALUE'),
-        measure.vars = c("Da", "A"),
+        measure.vars = c("Da", "A", 'DAA'),
         variable.factor = FALSE,
         variable.name = "Type",
         value.name = "ZONE"
@@ -828,7 +829,7 @@ gme_other_download_file <- function(filename, data_type = 'MSD_ServiziDispacciam
 
     # Validate filename
     validated_filename = gme_validate_filename(filename = filename, num_digits = 8, file_extension = "xml")
-    if(isTRUE(validated_filename)) {    
+    if(isTRUE(validated_filename)) {
 
     url_base = paste0('ftp://download.mercatoelettrico.org/MercatiElettrici/', data_type, '/')
     file_url <- paste0(url_base, filename)
@@ -903,7 +904,7 @@ gme_other_download_file <- function(filename, data_type = 'MSD_ServiziDispacciam
     } else {
         message(crayon::red("[ERROR] Wrong Filename"))
     }
-        
+
 }
 
 
@@ -1552,7 +1553,7 @@ gme_download_offers_file <- function(filename, data_type = 'MGP', output_dir, us
     # Validate filename
     validated_filename = gme_validate_filename(filename = filename, num_digits = 8, file_extension = "zip")
     if(isTRUE(validated_filename)) {
-        
+
     # Construct the file URL
     mkt_data_type <- paste0(data_type, '_OffertePubbliche/')
     url_base <- paste0('ftp://download.mercatoelettrico.org/MercatiElettrici/', mkt_data_type)
@@ -1620,11 +1621,11 @@ gme_download_offers_file <- function(filename, data_type = 'MGP', output_dir, us
     }
 
     return(result_df)
-        
+
     } else {
         message(crayon::red("[ERROR] Wrong Filename"))
     }
-    
+
 }
 
 
@@ -1739,7 +1740,7 @@ gme_igi_get_files <- function(data_type, output_dir = "data",
     # # Validate filename
     # validated_filename = gme_validate_filename(filename = filename, num_digits = 8, file_extension = "xml")
     # if(isTRUE(validated_filename)) {
-        
+
     url_base = paste0('ftp://download.mercatoelettrico.org/MercatiGas/MGPGAS_IGI//', data_type, '/')
 
     if (data_type == "IGI") {file_pattern = "\\S+IGI\\.xml$"}
@@ -1772,19 +1773,19 @@ gme_igi_get_files <- function(data_type, output_dir = "data",
         message(crayon::red("[ERROR] Error downloading files from FTP server", e$message))
         return(NULL)
     })
-        
+
     return(files_to_download)
-    
+
     # } else {
     #     message(crayon::red("[ERROR] Wrong Filename"))
     # }
-    
+
 }
- 
- 
+
+
  #' Validate Filename Structure
 #'
-#' This function checks whether a given filename matches a specific structure based on 
+#' This function checks whether a given filename matches a specific structure based on
 #' the number of leading digits, a middle expression, and the file extension.
 #'
 #' @param filename A string representing the filename to validate.
@@ -1809,12 +1810,11 @@ gme_igi_get_files <- function(data_type, output_dir = "data",
 gme_validate_filename = function(filename, num_digits = 8, file_extension = "xml") {
     # Build the regular expression dynamically
     pattern = paste0("^\\d{", num_digits, "}.*\\.", file_extension, "$")
-    
+
     if (!grepl(pattern, filename)) {
         cat(crayon::red("Wrong filename", "\n"))
         return(FALSE)
     }
     return(TRUE)
 }
-  
-  
+
