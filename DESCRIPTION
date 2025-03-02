@@ -32,6 +32,7 @@ Imports:
     tidyjson,
     timeDate,
     ggplot2,
+    openxlsx,
     rvest
 Suggests:
     roxygen2,
