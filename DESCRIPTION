@@ -33,6 +33,8 @@ Imports:
     timeDate,
     ggplot2,
     openxlsx,
+    zoo,
+    xts,
     rvest
 Suggests:
     roxygen2,
