@@ -96,3 +96,16 @@ find_missing_dates = function(dates, full_week = TRUE) {
   # Return the missing dates as a character vector
   return(as.character(missing_dates))
 }
+
+
+#' Convert Dates to First Day of the Month
+#'
+#' This function transforms a given date (or vector of dates) into the first day of the same month, formatted as `YYYY-MM-01`.
+#'
+#' @param dates A vector of dates in `"YYYY-MM-DD"` format. Can be `character`, `Date`, or `IDate`.
+#' @return A vector of dates converted to the first day of the respective month (`IDate` format).
+#' @export
+to_yymm = function(dates) {
+  dates = as.IDate(dates)  # Ensure it's a date
+  return(as.IDate(paste0(format(dates, "%Y-%m"), "-01")))
+}
