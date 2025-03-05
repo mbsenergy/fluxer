@@ -280,6 +280,8 @@ gme_dam_price_xml_to_data <- function(xml_file_path) {
     data_df_lg[, VALUE := as.numeric(gsub(",", ".", VALUE))]
     data_df_lg[, UNIT := 'EUR']
 
+    data_df_lg = unique(data_df_lg)
+
     return(data_df_lg)
 }
 
@@ -381,6 +383,8 @@ gme_dam_quantity_xml_to_data <- function(xml_file_path) {
     # Add unit for the values
     data_dt_long[, UNIT := "MWh"]
 
+    data_dt_long = unique(data_dt_long)
+
     return(data_dt_long)
 }
 
@@ -461,6 +465,8 @@ gme_dam_fabb_xml_to_data <- function(xml_file_path) {
     data_df_lg[, VALUE := as.numeric(gsub(",", ".", VALUE))]
     data_df_lg[, UNIT := 'MWh']
 
+    data_df_lg = unique(data_df_lg)
+
     return(data_df_lg)
 }
 
@@ -528,6 +534,8 @@ gme_dam_liq_xml_to_data <- function(xml_file_path) {
     data_df_lg <- melt(data_df, id.vars = c('DATE', 'TIME', 'HOUR', 'MARKET'), variable.factor = FALSE, variable.name = 'ZONE', value.name = 'VALUE')
     data_df_lg[, VALUE := as.numeric(gsub(",", ".", VALUE))]
     data_df_lg[, UNIT := 'MWh']
+
+    data_df_lg = unique(data_df_lg)
 
     return(data_df_lg)
 }
@@ -597,11 +605,13 @@ gme_dam_tran_xml_to_data <- function(xml_file_path) {
     data_df[, A := paste0('to_', A)]
     data_df[, DAA := paste(Da, A, sep = '-')]
     setnames(data_df, c('Data', 'Mercato', 'Ora'), c('DATE', 'MARKET', 'HOUR'))
+    data_df[, Da := NULL]
+    data_df[, A := NULL]
 
     melted_data = melt(
         data_df,
         id.vars = c("DATE", "MARKET", "HOUR", 'VALUE'),
-        measure.vars = c("Da", "A", 'DAA'),
+        measure.vars = c('DAA'),
         variable.factor = FALSE,
         variable.name = "Type",
         value.name = "ZONE"
@@ -611,6 +621,8 @@ gme_dam_tran_xml_to_data <- function(xml_file_path) {
     melted_data[, TIME := paste0(sprintf("%02d", as.numeric(HOUR)), ":00")]
     melted_data[, VALUE := as.numeric(gsub(",", ".", VALUE))]
     melted_data[, UNIT := 'MWh']
+
+    melted_data = unique(melted_data)
 
     return(melted_data)
 }
@@ -679,12 +691,15 @@ gme_dam_limtran_xml_to_data <- function(xml_file_path) {
     data_df[, Data := as.Date(Data, format = "%Y%m%d")]
     data_df[, Da := paste0('from_', Da)]
     data_df[, A := paste0('to_', A)]
+    data_df[, DAA := paste(Da, A, sep = '-')]
     setnames(data_df, c('Data', 'Mercato', 'Ora'), c('DATE', 'MARKET', 'HOUR'))
+    data_df[, Da := NULL]
+    data_df[, A := NULL]
 
     melted_data = melt(
         data_df,
         id.vars = c("DATE", "MARKET", "HOUR", "Limite", "Coefficiente"),
-        measure.vars = c("Da", "A"),
+        measure.vars = c("DAA"),
         variable.factor = FALSE,
         variable.name = "Type",
         value.name = "ZONE"
@@ -704,6 +719,8 @@ gme_dam_limtran_xml_to_data <- function(xml_file_path) {
     melted_data[, TIME := paste0(sprintf("%02d", as.numeric(HOUR)), ":00")]
     melted_data[, VARIABLE := as.character(VARIABLE)]
     melted_data[, UNIT := 'MW']
+
+    melted_data = unique(melted_data)
 
     return(melted_data)
 }
