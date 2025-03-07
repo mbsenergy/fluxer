@@ -44,10 +44,11 @@ db_get_minmax_dates <- function(con, table_name, date_column = "DATE") {
   # Execute the query
   result <- dbGetQuery(con, query)
 
-  message(crayon::bgCyan(paste('DATES:', result)))
-
   # Convert the result to a data.table
   result_dt <- as.data.table(result)
+
+  message(crayon::bgCyan(paste('FROM:', result_dt$min_date)))
+  message(crayon::bgCyan(paste('TO:', result_dt$max_date)))
 
   # Return the data.table
   return(result_dt)
@@ -108,4 +109,62 @@ find_missing_dates = function(dates, full_week = TRUE) {
 to_yymm = function(dates) {
   dates = as.IDate(dates)  # Ensure it's a date
   return(as.IDate(paste0(format(dates, "%Y-%m"), "-01")))
+}
+
+
+#' Count unique values in a column of a PostgreSQL table
+#'
+#' This function connects to a PostgreSQL database, retrieves the distinct values
+#' of a specified column in a table, and counts their occurrences.
+#'
+#' @param con A `DBI` connection object to the PostgreSQL database.
+#' @param table_name A character string specifying the name of the table.
+#' @param column_name A character string specifying the column to analyze.
+#'
+#' @return A data frame with unique values of the column and their counts.
+#' @export
+#'
+table_obs_dist <- function(con, table_name, column_name) {
+  # Construct the SQL query dynamically
+  query <- sprintf(
+    'SELECT "%s", COUNT(*) AS count
+     FROM "%s"
+     GROUP BY "%s"
+     ORDER BY "%s";',
+    column_name, table_name, column_name, column_name
+  )
+
+  # Execute the query and return the result
+  result <- DBI::dbGetQuery(con, query)
+
+  return(result)
+}
+
+
+library(data.table)
+
+#' Count unique values in a column of a data.table
+#'
+#' This function takes a data.table, groups by the specified column,
+#' and counts occurrences of each unique value.
+#'
+#' @param dt A `data.table` object.
+#' @param column_name A character string specifying the column to analyze.
+#'
+#' @return A `data.table` with unique values of the column and their counts.
+#' @export
+#'
+#' @examples
+#' dt <- data.table(DATE = c("2024-01-01", "2024-01-02", "2024-01-01", "2024-01-03"))
+#' count_column_values(dt, "DATE")
+dt_obs_dist <- function(dt, column_name) {
+  # Ensure input is a data.table
+  if (!is.data.table(dt)) {
+    stop("Input must be a data.table")
+  }
+
+  # Perform the count operation
+  result <- dt[, .N, by = .(get(column_name))] # Correct column referencing
+
+  return(result)
 }
