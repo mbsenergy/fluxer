@@ -183,7 +183,7 @@ entsoe_dam_prices = function(country, from_data, to_data, api_key = Sys.getenv('
 api_entsoe_dam_prices = function(country, from_data, to_data, api_key = Sys.getenv('ENTSOE_KEY')) {
 
   # Translate the country to the EIC code using the entsoe_countries mapping
-  entsoe_domain = entsoe_countries[CODE_ENTSOE == country]$CODE_EIC
+  entsoe_domain = entsoe_countries[COUNTRY == country]$CODE_EIC
 
   # Format the start and end period times for the API request
   period_start <- paste0(format(as.Date(from_data) - 1, "%Y%m%d"), "2300")
