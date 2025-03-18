@@ -1618,7 +1618,7 @@ gme_download_offers_file <- function(filename, data_type = 'MGP', output_dir, us
         if (!raw) {
                 result_df <- gme_offerts_zip_to_data(xml_file_name)
         } else {
-            message(glue::yellow("Raw mode: Skipping processing of XML file."))
+            message(crayon::yellow("Raw mode: Skipping processing of XML file."))
             result_df <- NULL
         }
 
@@ -1715,6 +1715,10 @@ gme_offerts_zip_to_data <- function(xml_file_path) {
 
     # Combine all parsed data into a data.table
     data_dt <- rbindlist(data_list, fill = TRUE)
+
+    if ("period" %in% colnames(data_dt)) {
+        setnames(data_dt, "period", "interval_no")
+    }
 
     return(data_dt)
 }

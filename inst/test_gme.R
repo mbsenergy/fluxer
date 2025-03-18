@@ -719,7 +719,7 @@ list_mgp_offers <- lapply(last_n_files, function(file) {
     })
 })
 
-dt_mgp_offers = rbindlist(list_mgp_offers)
+dt_mgp_offers = rbindlist(list_mgp_offers, fill = TRUE)
 print(dt_mgp_offers)
 
 
@@ -892,12 +892,12 @@ print(dt_igi)
 
 filename = '20241223MGPGASIGI.xml'
 gme_igi_download_file <- function(filename, output_dir, username, password, raw = FALSE) {
-    
+
     # Define the base URL and data type (hardcoded for IGI)
     data_type = "IGI"
     url_base = paste0('ftp://download.mercatoelettrico.org/MercatiGas/MGPGAS_IGI/', data_type, '/')
     file_url <- paste0(url_base, filename)
-    
+
     # Construct the output file path
     output_file <- file.path(output_dir, filename)
 
@@ -909,13 +909,13 @@ gme_igi_download_file <- function(filename, output_dir, username, password, raw 
 
     # Print the FTP URL for debugging
     message("Trying to download file from: ", file_url)
-    
+
     # Perform the download and process the XML file
     result_df <- tryCatch({
         # Download the file from the FTP server
         curl::curl_download(file_url, output_file, handle = h)
         message("File downloaded successfully: ", output_file)
-        
+
         # Process the downloaded XML file if not in raw mode
         if (isFALSE(raw)) {
             # Call the function to process the downloaded IGI XML

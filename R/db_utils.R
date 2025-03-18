@@ -168,3 +168,58 @@ dt_obs_dist <- function(dt, column_name) {
 
   return(result)
 }
+
+#' Compare Column Names Between Two data.tables
+#'
+#' This function compares the column names of two `data.table` objects and identifies which columns are missing in each.
+#'
+#' @param dt1 A `data.table` object.
+#' @param dt2 A `data.table` object.
+#' @param return_list Logical. If `TRUE`, the function returns a list with missing columns; if `FALSE`, it returns a formatted `kable` table. Default is `FALSE`.
+#'
+#' @return If `return_list = TRUE`, a named list with:
+#'   \item{missing_in_dt1}{Columns present in `dt2` but missing in `dt1`}
+#'   \item{missing_in_dt2}{Columns present in `dt1` but missing in `dt2`}
+#' If `return_list = FALSE`, a `kable` table showing missing columns.
+#'
+#' @examples
+#' library(data.table)
+#'
+#' dt1 = data.table(a = 1:5, b = 6:10, c = 11:15)
+#' dt2 = data.table(b = 1:5, c = 6:10, d = 11:15)
+#'
+#' # Return a kable table
+#' compare_colnames(dt1, dt2)
+#'
+#' # Return a list with missing columns
+#' compare_colnames(dt1, dt2, return_list = TRUE)
+#'
+#' @import data.table knitr
+#' @export
+compare_colnames = function(dt1, dt2, return_list=FALSE) {
+    dt1_name = deparse(substitute(dt1))
+    dt2_name = deparse(substitute(dt2))
+
+    cols1 = colnames(dt1)
+    cols2 = colnames(dt2)
+
+    missing_in_dt1 = setdiff(cols2, cols1) # Columns in dt2 but not in dt1
+    missing_in_dt2 = setdiff(cols1, cols2) # Columns in dt1 but not in dt2
+
+    if (return_list) {
+        return(list(
+            setNames(list(missing_in_dt1), paste0("missing_in_", dt1_name)),
+            setNames(list(missing_in_dt2), paste0("missing_in_", dt2_name))
+        ))
+    } else {
+        result_dt = data.table::data.table(
+            Column = c(missing_in_dt1, missing_in_dt2),
+            Missing_In = c(rep(dt1_name, length(missing_in_dt1)), rep(dt2_name, length(missing_in_dt2)))
+        )
+
+        return(knitr::kable(result_dt, format = "markdown"))
+    }
+}
+
+
+
