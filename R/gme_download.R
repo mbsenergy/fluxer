@@ -1129,13 +1129,14 @@ gme_mb_rs_xml_to_data <- function(xml_file_path) {
     # Clean and type-convert fields where necessary
     combined_data[, `:=`(
         Data = as.Date(Data, format = "%Y%m%d"),
-        Ora = as.integer(Ora)
+        Ora = as.integer(Ora),
+        Periodo = as.integer(Periodo)
     )]
 
     # Tidy the data for analysis
     melted_data <- melt(
         combined_data,
-        id.vars = c("Data", "Ora", "Mercato"),
+        id.vars = c("Data", "Ora", "Mercato", "Periodo"),
         variable.name = "ZONE_VARIABLE",
         variable.factor = FALSE,
         value.name = "VALUE"
@@ -1153,7 +1154,7 @@ gme_mb_rs_xml_to_data <- function(xml_file_path) {
     melted_data[, UNIT := ifelse(grepl("MWh", VARIABLE), "MWh", "EUR")]
     melted_data[, ZONE_VARIABLE := NULL]
     melted_data[, TIME := paste0(sprintf("%02d", as.numeric(Ora)), ":00")]
-    setnames(melted_data, c('Data', 'Mercato', 'Ora'), c('DATE', 'MARKET', 'HOUR'))
+    setnames(melted_data, c('Data', 'Mercato', 'Ora', 'Periodo'), c('DATE', 'MARKET', 'HOUR', 'PERIOD'))
     melted_data[, MARKET := 'MB Riserva Secondaria']
 
     return(melted_data)
@@ -1221,6 +1222,7 @@ gme_mb_as_xml_to_data <- function(xml_file_path) {
         dt <- data.table::data.table(
             FIELD = field_names,
             VALUE = gsub(",", ".", field_values)
+
         )
         # Reshape to wide format
         data.table::dcast(dt, . ~ FIELD, value.var = "VALUE")[, . := NULL] # Drop placeholder column '.'
@@ -1232,13 +1234,14 @@ gme_mb_as_xml_to_data <- function(xml_file_path) {
     # Clean and type-convert fields where necessary
     combined_data[, `:=`(
         Data = as.Date(Data, format = "%Y%m%d"),
-        Ora = as.integer(Ora)
+        Ora = as.integer(Ora),
+        Periodo = as.integer(Periodo)
     )]
 
     # Tidy the data for analysis
     melted_data <- melt(
         combined_data,
-        id.vars = c("Data", "Ora", "Mercato"),
+        id.vars = c("Data", "Ora", "Mercato", "Periodo"),
         variable.name = "ZONE_VARIABLE",
         variable.factor = FALSE,
         value.name = "VALUE"
@@ -1256,7 +1259,7 @@ gme_mb_as_xml_to_data <- function(xml_file_path) {
     melted_data[, UNIT := ifelse(grepl("MWh", VARIABLE), "MWh", "EUR")]
     melted_data[, ZONE_VARIABLE := NULL]
     melted_data[, TIME := paste0(sprintf("%02d", as.numeric(Ora)), ":00")]
-    setnames(melted_data, c('Data', 'Mercato', 'Ora'), c('DATE', 'MARKET', 'HOUR'))
+    setnames(melted_data, c('Data', 'Mercato', 'Ora', 'Periodo'), c('DATE', 'MARKET', 'HOUR', 'PERIOD'))
     melted_data[, MARKET := 'MB Altri Servizi']
 
     return(melted_data)
@@ -1335,13 +1338,14 @@ gme_mb_tl_xml_to_data <- function(xml_file_path) {
     # Clean and type-convert fields where necessary
     combined_data[, `:=`(
         Data = as.Date(Data, format = "%Y%m%d"),
-        Ora = as.integer(Ora)
+        Ora = as.integer(Ora),
+        Periodo = as.integer(Periodo)
     )]
 
     # Tidy the data for analysis
     melted_data <- melt(
         combined_data,
-        id.vars = c("Data", "Ora", "Mercato"),
+        id.vars = c("Data", "Ora", "Mercato", "Periodo"),
         variable.name = "ZONE_VARIABLE",
         variable.factor = FALSE,
         value.name = "VALUE"
@@ -1359,7 +1363,7 @@ gme_mb_tl_xml_to_data <- function(xml_file_path) {
     melted_data[, UNIT := ifelse(grepl("MWh", VARIABLE), "MWh", "EUR")]
     melted_data[, ZONE_VARIABLE := NULL]
     melted_data[, TIME := paste0(sprintf("%02d", as.numeric(Ora)), ":00")]
-    setnames(melted_data, c('Data', 'Mercato', 'Ora'), c('DATE', 'MARKET', 'HOUR'))
+    setnames(melted_data, c('Data', 'Mercato', 'Ora', 'Periodo'), c('DATE', 'MARKET', 'HOUR', 'PERIOD'))
     melted_data[, MARKET := 'MB Totali']
 
     return(melted_data)
