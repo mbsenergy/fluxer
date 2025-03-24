@@ -1,4 +1,35 @@
 
+# GME Directory -----------------------------------------------------------------------------------------------
+
+#' Retrieve FTP Directory Listing from GME
+#'
+#' This function connects to the GME FTP server and retrieves a directory listing.
+#'
+#' @param username FTP username. Default is `"PIASARACENO"`.
+#' @param password FTP password. Default is `"18N15C9R"`.
+#' @return A `data.table` containing the directory listing.
+#' @examples
+#' \dontrun{
+#' file_dt = gme_get_directory()
+#' print(file_dt)
+#' }
+#' @export
+gme_get_directory <- function(username = "PIASARACENO", password = "18N15C9R") {
+
+    url_base = paste0('ftp://download.mercatoelettrico.org/MercatiElettrici/')
+    ftp_list_cmd = paste0("curl -u ", username, ":", password, " ", url_base)
+    file_list = system(ftp_list_cmd, intern = TRUE)
+
+    file_dt = fread(
+        text = file_list,
+        fill = TRUE,
+        header = FALSE
+    )
+
+    return(file_dt)
+}
+
+
 # MGP ------------------------------------------------------------------------------------------------------
 
 #' Retrieve Files from GME FTP Server for DAM market
