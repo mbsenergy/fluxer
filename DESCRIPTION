@@ -44,3 +44,4 @@ Suggests:
 RoxygenNote: 7.3.2
 Depends: 
     R (>= 4.4.0)
+URL: https://mbsenergy.github.io/fluxer/
