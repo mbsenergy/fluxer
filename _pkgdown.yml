@@ -1,4 +1,12 @@
 url: https://mbsenergy.github.io/fluxer/
 template:
-  bootstrap: 5
+  params:
+    bootstrap: 5
+    bootswatch: flatly
+    favicon: man/figures/logo.png  # Optional
+home:
+  sidebar:
+    structure: [links, license]
+    logo: man/figures/logo.png
+
 
