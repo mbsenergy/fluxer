@@ -10,7 +10,7 @@ box::use(fluxer[...])
 
 ## DAM Prices RAW ----------------------
 
-country <- "Spain"
+country <- "Czech Republic"
 from_data <- '2024-01-04'
 to_data <- '2024-01-06'
 # api_key = Sys.getenv('ENTSOE_KEY')

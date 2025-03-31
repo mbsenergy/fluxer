@@ -98,7 +98,6 @@ entsoe_dam_prices = function(country, from_data, to_data, api_key = Sys.getenv('
     }
 
     # Generate a sequence of months from start to end
-    # Generate a sequence of months from start to end
     month_starts <- seq(from_data, to_data, by = "month")
     month_starts[1] <- as.Date(paste0(year(month_starts[1]), "-", month(month_starts[1]), "-01"))
     month_starts[-1] <- as.Date(paste0(year(month_starts[-1]), "-", month(month_starts[-1]), "-01"))
@@ -184,7 +183,7 @@ entsoe_dam_prices = function(country, from_data, to_data, api_key = Sys.getenv('
 api_entsoe_dam_prices = function(country, from_data, to_data, api_key = Sys.getenv('ENTSOE_KEY')) {
 
   # Translate the country to the EIC code using the entsoe_countries mapping
-  entsoe_domain = entsoe_countries[COUNTRY == country]$CODE_EIC
+  entsoe_domain = entsoe_countries[CODE_ENTSOE == country]$CODE_EIC
 
   # Format the start and end period times for the API request
   period_start <- paste0(format(as.Date(from_data) - 1, "%Y%m%d"), "2300")
@@ -204,15 +203,15 @@ api_entsoe_dam_prices = function(country, from_data, to_data, api_key = Sys.gete
   )
 
   # Make the GET request to the ENTSOE API
-  res <- VERB("GET", url = url, httr::content_type_xml(), httr::write_memory())
+  res <- httr::VERB("GET", url = url, httr::content_type_xml(), httr::write_memory())
 
   # Check for successful response
-  if (status_code(res) == 200) {
+  if (httr::status_code(res) == 200) {
     # Return the content of the response if successful
-    res_content = content(res, encoding = 'UTF-8')
+    res_content = httr::content(res, encoding = 'UTF-8')
   } else {
     # Return an error message if the request fails
-    stop(paste("API call failed with status code:", status_code(res)))
+    stop(paste("API call failed with status code:", httr::status_code(res)))
   }
 
   # Parse the XML response and extract the data using the extract_xml_data function
