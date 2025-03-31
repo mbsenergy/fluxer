@@ -1,7 +1,7 @@
 Package: fluxer
 Type: Package
 Title: FLUX collection of functions and utilities
-Version: 0.6.1
+Version: 0.7.0
 Authors@R: c(
     person(given = "Alejandro", 
            family = "Abraham", 

@@ -1,0 +1,8 @@
+Instrument ID,RIC,Security Description,Universal Close Price Date,Universal Close Price,Volume,Last Updated Volume,User Defined Identifier,User Defined Identifier2,User Defined Identifier3,User Defined Identifier4,User Defined Identifier5
+FEUAc1,FEUAc1,EEX EU Allowances (EUA) En Fut c1,28/03/2025,67.45,59,59,FEUAMc1,CO2,eex,M,1
+CFI2c1,CFI2c1,ICE EUA Energy Future c1,28/03/2025,67.45,2536,2536,CFI2cM1,CO2,ice,M,1
+EEX-EUA4DE-AUC,EEX-EUA4DE-AUC,EEX European Union Emission Allowanc,28/03/2025,67.36,1607000,1607000,EEX-EUA4DE-AUC,CO2,eex,aste,DE
+EEX-EUA4PL-AUC,EEX-EUA4PL-AUC,EEX European Union Emission Allowanc,19/03/2025,71.35,-9999401,2072500,EEX-EUA4PL-AUC,CO2,eex,aste,PL
+EEX-EUA4EU-AUC,EEX-EUA4EU-AUC,EEX EUA Fourth Phase Auction Price,27/03/2025,68.41,-9999401,3245500,EEX-EUA4EU-AUC,CO2,eex,aste,EU
+TRITPSVDA,TRITPSVDA,TR IT PSV D/A,28/03/2025,41,-9999301,-9999301,TRITPSVDA,PSV,reuters,spot,0
+TRNLTTFDA,TRNLTTFDA,TR NL TTF Day Ahead Contract,28/03/2025,40.03,-9999301,-9999301,TRNLTTFDA,TTF,reuters,spot,0
