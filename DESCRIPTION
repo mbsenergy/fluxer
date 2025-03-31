@@ -24,6 +24,7 @@ Imports:
     RPostgres,
     htmltools,
     httr,
+    httr2,
     curl,
     jsonlite,
     xml2,
