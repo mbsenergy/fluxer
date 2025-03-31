@@ -7,6 +7,15 @@
 <url><loc>https://mbsenergy.github.io/fluxer/reference/alba_download_data_power.html</loc></url>
 <url><loc>https://mbsenergy.github.io/fluxer/reference/api_entsoe_dam_prices.html</loc></url>
 <url><loc>https://mbsenergy.github.io/fluxer/reference/api_req.html</loc></url>
+<url><loc>https://mbsenergy.github.io/fluxer/reference/compare_colnames.html</loc></url>
+<url><loc>https://mbsenergy.github.io/fluxer/reference/datascope_download_extracted_file.html</loc></url>
+<url><loc>https://mbsenergy.github.io/fluxer/reference/datascope_instrument_items.html</loc></url>
+<url><loc>https://mbsenergy.github.io/fluxer/reference/datascope_instrument_lists.html</loc></url>
+<url><loc>https://mbsenergy.github.io/fluxer/reference/datascope_report_extraction_files.html</loc></url>
+<url><loc>https://mbsenergy.github.io/fluxer/reference/datascope_report_lastextraction.html</loc></url>
+<url><loc>https://mbsenergy.github.io/fluxer/reference/datascope_report_template_schedules.html</loc></url>
+<url><loc>https://mbsenergy.github.io/fluxer/reference/datascope_report_templates.html</loc></url>
+<url><loc>https://mbsenergy.github.io/fluxer/reference/datascope_token.html</loc></url>
 <url><loc>https://mbsenergy.github.io/fluxer/reference/db_get_minmax_dates.html</loc></url>
 <url><loc>https://mbsenergy.github.io/fluxer/reference/dt_obs_dist.html</loc></url>
 <url><loc>https://mbsenergy.github.io/fluxer/reference/entsoe_actual_generation.html</loc></url>
@@ -26,6 +35,7 @@
 <url><loc>https://mbsenergy.github.io/fluxer/reference/gme_dam_quantity_xml_to_data.html</loc></url>
 <url><loc>https://mbsenergy.github.io/fluxer/reference/gme_dam_tran_xml_to_data.html</loc></url>
 <url><loc>https://mbsenergy.github.io/fluxer/reference/gme_download_offers_file.html</loc></url>
+<url><loc>https://mbsenergy.github.io/fluxer/reference/gme_get_directory.html</loc></url>
 <url><loc>https://mbsenergy.github.io/fluxer/reference/gme_igi_get_files.html</loc></url>
 <url><loc>https://mbsenergy.github.io/fluxer/reference/gme_mb_as_xml_to_data.html</loc></url>
 <url><loc>https://mbsenergy.github.io/fluxer/reference/gme_mb_rs_xml_to_data.html</loc></url>
