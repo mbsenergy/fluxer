@@ -116,6 +116,7 @@ entsoe_dam_prices = function(country, from_data, to_data, api_key = Sys.getenv('
     }
 
     results <- lapply(1:nrow(dt_dates), function(i) {
+        Sys.sleep(1)
         api_entsoe_dam_prices(country, dt_dates$FROM[i], dt_dates$TO[i], api_key)
     })
 
