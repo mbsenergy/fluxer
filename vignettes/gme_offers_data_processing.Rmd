@@ -1,0 +1,141 @@
+---
+title: "GME Offers Data Processing"
+author: "Your Name"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{GME Offers Data Processing}
+  %\VignetteEngine{knitr::rmarkdown}
+---
+
+## Introduction
+
+This vignette demonstrates how to download and process GME (Gestore dei Mercati Energetici) offers data for both MGP (Mercato Giornaliero di Produzione) and MSD (Mercato dei Servizi di Dispacciamento). The data is retrieved from a remote FTP server and processed into clean datasets.
+
+The code is divided into two parts:
+1. **MGP Offers**: Download and process MGP offers.
+2. **MSD Offers**: Download and process MSD offers.
+
+## Setup
+
+We first define the parameters required for downloading and processing the files. The data types, FTP credentials, and output directory are set as follows:
+
+```{r setup}
+library(data.table)
+library(fluxer)
+# Set the parameters for both MGP and MSD
+n <- 2  # Number of files to process
+
+data_type_mgp <- 'MGP'
+data_type_msd <- 'MSD'
+
+username <- "PIASARACENO"
+password <- "18N15C9R"
+output_dir <- "inst/data"
+```
+
+## 1. MGP Offers
+### 1.1 Get Available Files
+We use the function `gme_offers_get_files()` to list all available MGP files in the GME folder. We then select the last n files for processing.
+
+
+```{r}
+# Get MGP offers files available at GME folder
+gme_mgp_offers_files <- gme_offers_get_files(data_type = data_type_mgp, 
+                                             output_dir = output_dir, 
+                                             username = username, 
+                                             password = password)
+
+# Select the last n files
+last_n_files <- tail(gme_mgp_offers_files, n)
+print(last_n_files)
+
+```
+
+### 1.2 Download and Clean Data
+We then download and process the data from the selected MGP files using the function `gme_download_offers_file()`. The downloaded data is cleaned and combined into a single dataset.
+
+
+```{r}
+list_mgp_offers <- lapply(last_n_files, function(file) {
+    tryCatch({
+        # Call gme_download_offers_file with explicit arguments
+        gme_download_offers_file(
+            filename = file,
+            data_type = data_type_mgp,
+            output_dir = output_dir,
+            username = username,
+            password = password,
+            raw = FALSE
+        )
+    }, error = function(e) {
+        # In case of an error, return NULL
+        message("Error processing file: ", file, " - ", e$message)
+        return(NULL)
+    })
+})
+
+# Combine the downloaded MGP offers into a single data.table
+dt_mgp_offers <- rbindlist(list_mgp_offers, fill = TRUE)
+print(dt_mgp_offers)
+
+```
+
+## 2. MSD Offers
+### 2.1 Get Available Files
+Similar to the MGP process, we retrieve the available MSD offers files and select the last n files for processing.
+
+```{r}
+library(data.table)
+library(fluxer)
+# Get MSD offers files available at GME folder
+gme_msd_offers_files <- gme_offers_get_files(data_type = data_type_msd, 
+                                             output_dir = output_dir, 
+                                             username = username, 
+                                             password = password)
+
+# Select the last n files
+last_n_files_msd <- tail(gme_msd_offers_files, n)
+print(last_n_files_msd)
+
+```
+
+### 2.2 Download and Clean Data
+We download and clean the MSD offers data in the same manner as the MGP offers data.
+
+
+```{r}
+list_msd_offers <- lapply(last_n_files_msd, function(file) {
+    tryCatch({
+        # Call gme_download_offers_file with explicit arguments
+        gme_download_offers_file(
+            filename = file,
+            data_type = data_type_msd,
+            output_dir = output_dir,
+            username = username,
+            password = password,
+            raw = FALSE
+        )
+    }, error = function(e) {
+        # In case of an error, return NULL
+        message("Error processing file: ", file, " - ", e$message)
+        return(NULL)
+    })
+})
+
+# Combine the downloaded MSD offers into a single data.table
+dt_msd_offers <- rbindlist(list_msd_offers)
+print(dt_msd_offers)
+
+```
+
+## Conclusion
+This vignette demonstrated how to download and process GME offers data for both MGP and MSD. By using FTP credentials and defining the necessary parameters, the data is cleaned and combined into two datasets: one for MGP offers and one for MSD offers.
+
+You can customize the number of files to process by adjusting the parameter n and modify the data processing functions to meet your specific needs.
+
+Don't forget to handle errors gracefully in case any file fails to download or process.
+
+## Additional Notes
+- Make sure to replace the FTP `username` and `password` with your actual credentials.  
+- The data is saved to the directory defined by `output_dir`, which is `inst/data` by default.  
+- You can modify the `gme_offers_get_files()` and `gme_download_offers_file()` functions to include additional functionality or error handling if needed.  

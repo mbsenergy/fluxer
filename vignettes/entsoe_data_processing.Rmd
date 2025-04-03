@@ -1,0 +1,71 @@
+---
+title: "DAM Prices Retrieval and Analysis"
+author: "Your Name"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{DAM Prices Retrieval and Analysis}
+  %\VignetteEngine{knitr::rmarkdown}
+---
+
+## Introduction
+
+This vignette demonstrates how to retrieve and analyze Day-Ahead Market (DAM) prices for different countries and date ranges using the `api_entsoe_dam_prices()` and `entsoe_dam_prices()` functions. We will cover:
+1. Retrieving raw DAM prices data using an API method.
+2. Analyzing and plotting DAM prices for a given country and date range.
+
+## Setup
+
+The first step is to load the necessary packages. We use `data.table` for efficient data manipulation, `magrittr` for piping, `ggplot2` for plotting, and a custom package `fluxer` for API integration.
+
+```{r setup}
+box::use(data.table[...])
+box::use(fluxer[...])
+```
+
+## 1. API Method for Retrieving DAM Prices
+### 1.1 Raw DAM Prices
+We start by using the api_entsoe_dam_prices function to retrieve raw DAM prices for a specific country and date range. For this example, we retrieve data for the Czech Republic from January 4, 2024, to January 6, 2024.
+
+
+```{r}
+country <- "Czech Republic"
+from_data <- '2024-01-04'
+to_data <- '2024-01-06'
+# api_key = Sys.getenv('ENTSOE_KEY')  # Uncomment and provide API key if needed
+
+dam_prices <- api_entsoe_dam_prices(country, from_data, to_data)
+print(dam_prices)
+
+```
+
+The function api_entsoe_dam_prices takes the country, start date, and end date as arguments and returns raw DAM prices data. The raw data is printed for inspection.
+
+## 1.2 Processed DAM Prices
+Next, we retrieve and process the DAM prices for Spain over a longer period, from January 4, 2024, to February 8, 2024, using the entsoe_dam_prices function. This function allows us to process the raw data and optionally visualize it.
+
+
+```{r}
+country <- "Spain"
+from_data <- '2024-01-04'
+to_data <- '2024-02-08'
+# api_key = Sys.getenv('ENTSOE_KEY')  # Uncomment and provide API key if needed
+
+dam_prices <- entsoe_dam_prices(country, from_data, to_data, verbose = TRUE, plot = TRUE)
+print(dam_prices)
+
+```
+
+In this step, the `entsoe_dam_prices()` function not only retrieves the data but also processes it and creates a plot if the `plot` argument is set to `TRUE`.
+
+## Conclusion
+In this vignette, we demonstrated how to retrieve raw and processed DAM prices for different countries using the `api_entsoe_dam_prices()` and `entsoe_dam_prices()` functions.
+
+Analyze the data by plotting DAM prices over a specific date range.
+
+You can modify the parameters such as country, start date, and end date to retrieve and analyze DAM prices for other regions and periods.
+
+Make sure to handle API keys securely by using environment variables (`Sys.getenv('ENTSOE_KEY')`), especially when deploying in production environments.
+
+# Additional Notes
+- The `entsoe_dam_prices()` function includes optional arguments like `verbose` and `plot` for more detailed output and visualizations.  
+- If you are working with large datasets, consider using `data.table` functions for efficient data manipulation.

@@ -29,6 +29,7 @@ dt_inst_list = datascope_instrument_lists(auth_token = auth_token)
 ## GET INSTRUMENTS LIST ITEMS ------------------
 
 dt_inst_items = datascope_instrument_items(instrument_list_id = dt_inst_list[Name == 'Forward_commodities'][1]$ListId, auth_token = auth_token)
+dt_inst_items = datascope_instrument_items(instrument_list_id = dt_inst_list[Name == 'Forward_commodities'][1]$ListId, auth_token = auth_token)
 
 
 ## GET REPORT TEMPLATES ------------------------------------

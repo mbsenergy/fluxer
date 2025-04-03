@@ -1,0 +1,93 @@
+---
+title: "GME Prices Data Processing"
+author: "Your Name"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{GME Prices Data Processing}
+  %\VignetteEngine{knitr::rmarkdown}
+---
+
+## Introduction
+
+This vignette demonstrates how to download and process GME (Gestore dei Mercati Energetici) price data for both MGP (Mercato Giornaliero di Produzione) and MSD (Mercato dei Servizi di Dispacciamento). The data is retrieved from a remote FTP server and processed into clean datasets.
+
+The code is divided into two parts:
+1. **MGP Prices**: Download and process MGP prices.
+2. **MSD Prices**: Download and process MSD prices.
+
+## Setup
+
+We first define the parameters required for downloading and processing the files. The data types, FTP credentials, and output directory are set as follows:
+
+```{r setup}
+# Set the parameters for both MGP and MSD
+n <- 2  # Number of files to process
+
+data_type_mgp <- 'MGP'
+data_type_msd <- 'MSD'
+
+username <- "PIASARACENO"
+password <- "18N15C9R"
+output_dir <- "inst/data"
+```
+
+## 1. MGP Prices
+### 1.1 Get Available Files
+We use the function `gme_prices_get_files()` to list all available MGP price files in the GME folder. We then select the last n files for processing.
+
+
+```{r}
+library(data.table)
+library(fluxer)
+# Get MGP prices files available at GME folder
+gme_mgp_prices_files <- gme_prices_get_files(data_type = data_type_mgp, 
+                                             output_dir = output_dir, 
+                                             username = username, 
+                                             password = password)
+
+# Select the last n files
+last_n_files_mgp <- tail(gme_mgp_prices_files, n)
+print(last_n_files_mgp)
+
+```
+
+## 1.2 Download and Clean Data
+We then download and process the data from the selected MGP price files using the function `gme_download_prices_file()`. The downloaded data is cleaned and combined into a single dataset.
+
+```{r}
+list_mgp_prices <- lapply(last_n_files_mgp, function(file) {
+    tryCatch({
+        # Call gme_download_prices_file with explicit arguments
+        gme_download_prices_file(
+            filename = file,
+            data_type = data_type_mgp,
+            output_dir = output_dir,
+            username = username,
+            password = password,
+            raw = FALSE
+        )
+    }, error = function(e) {
+        # In case of an error, return NULL
+        message("Error processing file: ", file, " - ", e$message)
+        return(NULL)
+    })
+})
+
+# Combine the downloaded MGP prices into a single data.table
+dt_mgp_prices <- rbindlist(list_mgp_prices, fill = TRUE)
+print(dt_mgp_prices)
+
+```
+
+## Conclusion
+This vignette demonstrated how to download and process GME prices data for both MGP and MSD. By using FTP credentials and defining the necessary parameters, the data is cleaned and combined into two datasets: one for MGP prices and one for MSD prices.
+
+You can customize the number of files to process by adjusting the parameter n and modify the data processing functions to meet your specific needs.
+
+Don't forget to handle errors gracefully in case any file fails to download or process.
+
+## Additional Notes
+## Additional Notes
+- Make sure to replace the FTP `username` and `password` with your actual credentials.  
+- The data is saved to the directory defined by `output_dir`, which is `inst/data` by default.  
+- You can modify the `gme_download_prices_file()` function to include additional functionality or error handling if needed.  

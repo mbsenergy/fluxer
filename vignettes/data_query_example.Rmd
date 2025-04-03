@@ -1,0 +1,90 @@
+---
+title: "Querying Data with Filters"
+author: "Your Name"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Querying Data with Filters}
+  %\VignetteEngine{knitr::rmarkdown}
+---
+
+## Introduction
+
+This vignette demonstrates how to query a PostgreSQL database using specific date filters and country filters from a data table. We use the `DBI` and `RPostgres` packages to connect to a PostgreSQL database and retrieve filtered data.
+
+## Setup
+
+To begin, we need to connect to a PostgreSQL database using the `DBI` package. You will need a valid connection to your PostgreSQL database for this to work.
+
+```{r setup, message=FALSE}
+library(DBI)
+library(RPostgres)
+
+# Connect to your PostgreSQL database
+con = DBI::dbConnect(
+  RPostgres::Postgres(),
+  host = Sys.getenv('PG_FLUX_HOST'),
+  port = Sys.getenv('PG_FLUX_PORT'),
+  dbname = Sys.getenv('PG_FLUX_DBNAME'),
+  user = Sys.getenv('PG_FLUX_USER'),
+  password = Sys.getenv('PG_FLUX_PSW'),
+  sslmode = "require"  
+)
+```
+
+## Define the Query Function
+Below is the function that retrieves data between two dates and filters based on a vector of country codes. The function constructs an **SQL** query dynamically based on the provided input parameters.
+
+
+```{r, qurey-function}
+query_data <- function(start_date, end_date, country_vector, con) {
+  # Create a string for the IN clause
+  country_filter <- paste0("'", country_vector, "'", collapse = ", ")
+
+  # Construct the SQL query
+  query <- sprintf('SELECT * FROM "%s" WHERE "%s" BETWEEN \'%s\' AND \'%s\' 
+                    AND "%s" IN (%s)', 
+                   "TS01_entsoe_dam_prices",   # Table name (quoted)
+                   "DATE",  # Date column name (quoted)
+                   start_date, 
+                   end_date,
+                   "COUNTRY",  # Country column name (quoted)
+                   country_filter)  # Formatted country vector
+
+  cat(crayon::green(query))  # Using green color for printing
+
+  # Execute the query and fetch the data
+  result <- DBI::dbGetQuery(con, query)
+
+  return(result)
+}
+
+```
+
+## Example Usage
+Here is an example of how to use the `query_data()` function to query the `TS01_entsoe_dam_prices` table for data between two dates and for a list of country codes.
+
+
+```{r, example}
+# Define the date range
+start_date <- '2019-01-01'
+end_date <- '2024-03-31'
+
+# Define the country codes
+country_vector <- c('Austria', 'France', 'Italy')
+
+# Query the data
+result <- query_data(start_date, end_date, country_vector, con)
+
+# View the result
+head(result)
+
+```
+
+## Conclusion
+This vignette demonstrated how to query data from a PostgreSQL database using specific date ranges and country filters. You can modify the date range and country filter to suit your specific needs.
+
+> Don't forget to disconnect from the database after you're done.
+
+```{r, disconnect}
+dbDisconnect(con)
+```
