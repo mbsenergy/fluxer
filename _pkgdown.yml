@@ -4,11 +4,20 @@ template:
   bslib:
     bootswatch: zephyr
     pkgdown-nav-height: 100px
-    primary: "#0E9DD3"
-    base_font: {google: "Inter"}
-    heading_font: {google: "Inter"}
-    code_font: {google: "JetBrains Mono"}
+    primary: '#0E9DD3'
+    base_font:
+      google: Inter
+    heading_font:
+      google: Inter
+    code_font:
+      google: JetBrains Mono
 navbar:
   structure:
-    left:  [intro, reference, articles]
-    right: [search, github]
+    left:
+    - intro
+    - reference
+    - articles
+    right:
+    - search
+    - github
+
