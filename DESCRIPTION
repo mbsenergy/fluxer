@@ -2,17 +2,14 @@ Package: fluxer
 Type: Package
 Title: FLUX Collection of Functions and Utilities
 Version: 0.7.0
-Authors@R: c(
-    person(given = "Alejandro", 
-           family = "Abraham", 
+Authors@R: 
+    person(given = "Alejandro",
+           family = "Abraham",
            role = c("aut", "cre"),
-           email = "alejandro.abraham@cerved.com"),
-    person(given = "Lorenza", 
-           family = "Tomassetti", 
-           role = "aut",
-           email = "lorenza.tomassetti@cerved.com")
-)
-Description: A repository of utilities to programmatically interact with FLUX using R.
+           email = "alejandro.abraham@cerved.com")
+Description: A repository of utilities to programmatically interact with DATAFLUX
+    using R. The development repository is available at
+    https://github.com/mbsenergy/fluxer.
 License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
@@ -46,5 +43,6 @@ Suggests:
     usethis,
     altdoc
 URL: https://mbsenergy.github.io/fluxer/
+BugReports: https://github.com/mbsenergy/fluxer/issues
 VignetteBuilder: quarto
 RoxygenNote: 7.3.2
