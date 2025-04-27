@@ -1,10 +1,12 @@
 ---
 title: "DAM Prices Retrieval and Analysis"
-author: "Your Name"
-output: rmarkdown::html_vignette
+format: 
+  html:
+    toc: true
+    html-math-method: mathjax
 vignette: >
   %\VignetteIndexEntry{DAM Prices Retrieval and Analysis}
-  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEngine{quarto::html}
 ---
 
 ## Introduction

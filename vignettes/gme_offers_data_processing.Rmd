@@ -1,10 +1,12 @@
 ---
 title: "GME Offers Data Processing"
-author: "Your Name"
-output: rmarkdown::html_vignette
+format: 
+  html:
+    toc: true
+    html-math-method: mathjax
 vignette: >
   %\VignetteIndexEntry{GME Offers Data Processing}
-  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEngine{quarto::html}
 ---
 
 ## Introduction

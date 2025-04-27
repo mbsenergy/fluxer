@@ -6,3 +6,5 @@
 ^docs$
 ^pkgdown$
 ^\.github$
+^altdoc$
+^_quarto$

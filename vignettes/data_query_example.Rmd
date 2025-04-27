@@ -1,10 +1,12 @@
 ---
 title: "Querying Data with Filters"
-author: "Your Name"
-output: rmarkdown::html_vignette
+format: 
+  html:
+    toc: true
+    html-math-method: mathjax
 vignette: >
   %\VignetteIndexEntry{Querying Data with Filters}
-  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEngine{quarto::html}
 ---
 
 ## Introduction

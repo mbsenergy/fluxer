@@ -1,6 +1,6 @@
 Package: fluxer
 Type: Package
-Title: FLUX collection of functions and utilities
+Title: FLUX Collection of Functions and Utilities
 Version: 0.7.0
 Authors@R: c(
     person(given = "Alejandro", 
@@ -11,12 +11,14 @@ Authors@R: c(
            family = "Tomassetti", 
            role = "aut",
            email = "lorenza.tomassetti@cerved.com")
-           )
-Description: It is a repository to use programmatically R for DATAFLUX only.
+)
+Description: A repository of utilities to programmatically interact with FLUX using R.
 License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
 Roxygen: list(markdown = TRUE)
+Depends: 
+    R (>= 4.4.0)
 Imports: 
     data.table,
     magrittr,
@@ -42,8 +44,7 @@ Suggests:
     roxygen2,
     devtools,
     usethis,
-    ggplot2
-RoxygenNote: 7.3.2
-Depends: 
-    R (>= 4.4.0)
+    altdoc
 URL: https://mbsenergy.github.io/fluxer/
+VignetteBuilder: quarto
+RoxygenNote: 7.3.2
