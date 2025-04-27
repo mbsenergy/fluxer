@@ -18,6 +18,8 @@ This vignette demonstrates how to query a PostgreSQL database using specific dat
 To begin, we need to connect to a PostgreSQL database using the `DBI` package. You will need a valid connection to your PostgreSQL database for this to work.
 
 ```{r setup, message=FALSE}
+#| eval: false
+
 library(DBI)
 library(RPostgres)
 
@@ -38,6 +40,8 @@ Below is the function that retrieves data between two dates and filters based on
 
 
 ```{r, qurey-function}
+#| eval: false
+
 query_data <- function(start_date, end_date, country_vector, con) {
   # Create a string for the IN clause
   country_filter <- paste0("'", country_vector, "'", collapse = ", ")
@@ -67,6 +71,8 @@ Here is an example of how to use the `query_data()` function to query the `TS01_
 
 
 ```{r, example}
+#| eval: false
+
 # Define the date range
 start_date <- '2019-01-01'
 end_date <- '2024-03-31'
@@ -88,5 +94,7 @@ This vignette demonstrated how to query data from a PostgreSQL database using sp
 > Don't forget to disconnect from the database after you're done.
 
 ```{r, disconnect}
+#| eval: false
+
 dbDisconnect(con)
 ```

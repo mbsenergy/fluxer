@@ -41,7 +41,7 @@ Suggests:
     roxygen2,
     devtools,
     usethis,
-    altdoc
+    pkgdown
 URL: https://mbsenergy.github.io/fluxer/
 BugReports: https://github.com/mbsenergy/fluxer/issues
 VignetteBuilder: quarto
