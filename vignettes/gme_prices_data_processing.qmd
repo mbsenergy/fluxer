@@ -21,7 +21,7 @@ The code is divided into two parts:
 
 We first define the parameters required for downloading and processing the files. The data types, FTP credentials, and output directory are set as follows:
 
-```{r setup}
+```{r setup, eval=FALSE}
 # Set the parameters for both MGP and MSD
 n <- 2  # Number of files to process
 
@@ -38,7 +38,7 @@ output_dir <- "inst/data"
 We use the function `gme_prices_get_files()` to list all available MGP price files in the GME folder. We then select the last n files for processing.
 
 
-```{r}
+```{r, eval=FALSE}
 library(data.table)
 library(fluxer)
 # Get MGP prices files available at GME folder
@@ -56,7 +56,7 @@ print(last_n_files_mgp)
 ## 1.2 Download and Clean Data
 We then download and process the data from the selected MGP price files using the function `gme_download_prices_file()`. The downloaded data is cleaned and combined into a single dataset.
 
-```{r}
+```{r, eval=FALSE}
 list_mgp_prices <- lapply(last_n_files_mgp, function(file) {
     tryCatch({
         # Call gme_download_prices_file with explicit arguments

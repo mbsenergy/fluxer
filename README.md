@@ -1,14 +1,20 @@
-# fluxer
-FLUX collection of functions and utilities
+
+[![MBSENERGY](https://img.shields.io/badge/MBS-ENERGY-037f8c?style=for-the-badge)](mbsconsulting.com)
+[![Made with R](https://img.shields.io/badge/Made%20with-rstats-88c0d0?style=for-the-badge&logo=r)](https://cran.r-project.org/)
+
+
+# fluxer <a href="https://mbsconsulting.com"><img src="man/figures/fluxer.png" align="right" height="180" /></a>
+
+**FLUX collection of functions and utilities**
 
 ## Installation
-```R
-# Install devtools if not already installed
-install.packages("devtools")
 
-# Install fluxer from GitHub (if applicable)
-devtools::install_github("your-username/fluxer")
-```
+Install the package using `remotes`:
+
+````r
+install.packages("remotes")
+remotes::install_github("mbsenergy/eikondata")
+````
 
 ## Develop
 

@@ -1,0 +1,12 @@
+pandoc: '3.2'
+pkgdown: 2.1.1
+pkgdown_sha: ~
+articles:
+  data_query_example: data_query_example.html
+  entsoe_data_processing: entsoe_data_processing.html
+  gme_offers_data_processing: gme_offers_data_processing.html
+  gme_prices_data_processing: gme_prices_data_processing.html
+last_built: 2025-04-28T07:36Z
+urls:
+  reference: https://mbsenergy.github.io/fluxer/reference
+  article: https://mbsenergy.github.io/fluxer/articles

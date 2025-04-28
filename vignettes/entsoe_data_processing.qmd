@@ -19,7 +19,7 @@ This vignette demonstrates how to retrieve and analyze Day-Ahead Market (DAM) pr
 
 The first step is to load the necessary packages. We use `data.table` for efficient data manipulation, `magrittr` for piping, `ggplot2` for plotting, and a custom package `fluxer` for API integration.
 
-```{r setup}
+```{r setup, eval=FALSE}
 box::use(data.table[...])
 box::use(fluxer[...])
 ```
@@ -29,7 +29,7 @@ box::use(fluxer[...])
 We start by using the api_entsoe_dam_prices function to retrieve raw DAM prices for a specific country and date range. For this example, we retrieve data for the Czech Republic from January 4, 2024, to January 6, 2024.
 
 
-```{r}
+```{r, eval=FALSE}
 country <- "Czech Republic"
 from_data <- '2024-01-04'
 to_data <- '2024-01-06'
@@ -46,7 +46,7 @@ The function api_entsoe_dam_prices takes the country, start date, and end date a
 Next, we retrieve and process the DAM prices for Spain over a longer period, from January 4, 2024, to February 8, 2024, using the entsoe_dam_prices function. This function allows us to process the raw data and optionally visualize it.
 
 
-```{r}
+```{r, eval=FALSE}
 country <- "Spain"
 from_data <- '2024-01-04'
 to_data <- '2024-02-08'
