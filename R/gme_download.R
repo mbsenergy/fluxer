@@ -1530,9 +1530,9 @@ gme_offers_get_files <- function(data_type, output_dir = "data",
     if (data_type == "MGP") {file_pattern = "\\S+MGPOffertePubbliche\\.zip$"}
     if (data_type == "MSD") {file_pattern = "\\S+MSDOffertePubbliche\\.zip$"}
     if (data_type == "MB") {file_pattern = "\\S+MBOffertePubbliche\\.zip$"}
-    if (data_type == "MI-A1") {file_pattern = "\\S+MI\\.zip$"}
-    if (data_type == "MI-A2") {file_pattern = "\\S+MI\\.zip$"}
-    if (data_type == "MI-A3") {file_pattern = "\\S+MI\\.zip$"}
+    if (data_type == "MI-A1") {file_pattern = "\\S+MI-A1OffertePubbliche\\.zip$"}
+    if (data_type == "MI-A2") {file_pattern = "\\S+MI-A2OffertePubbliche\\.zip$"}
+    if (data_type == "MI-A3") {file_pattern = "\\S+MI-A3OffertePubbliche\\.zip$"}
     if (data_type == "XBID") {file_pattern = "\\S+XBIDOffertePubbliche\\.zip$"}
 
     # Ensure output directory exists
