@@ -1126,17 +1126,29 @@ gme_mb_rs_xml_to_data <- function(xml_file_path) {
     # Combine all intermediate data.tables
     combined_data <- rbindlist(data_list, fill = TRUE)
 
-    # Clean and type-convert fields where necessary
-    combined_data[, `:=`(
-        Data = as.Date(Data, format = "%Y%m%d"),
-        Ora = as.integer(Ora),
-        Periodo = as.integer(Periodo)
+    if (!"Periodo" %in% colnames(combined_data)) {
+        combined_data[, `:=`(
+            Data = as.Date(Data, format = "%Y%m%d"),
+            Ora = as.integer(Ora),
+            Periodo = as.integer(Ora)
+        )]
+    } else {
+        combined_data[, `:=`(
+            Data = as.Date(Data, format = "%Y%m%d"),
+            Ora = as.integer(Ora),
+            Periodo = as.integer(Periodo)
+        )]
+    }
+
+    combined_data[, RESOLUTION_TYPE := fifelse(
+        .N == 24, "60M",
+        fifelse(.N == 96, "15M", "OTHER")
     )]
 
     # Tidy the data for analysis
     melted_data <- melt(
         combined_data,
-        id.vars = c("Data", "Ora", "Mercato", "Periodo"),
+        id.vars = c("Data", "Ora", "Mercato", "Periodo", "RESOLUTION_TYPE"),
         variable.name = "ZONE_VARIABLE",
         variable.factor = FALSE,
         value.name = "VALUE"
@@ -1231,17 +1243,29 @@ gme_mb_as_xml_to_data <- function(xml_file_path) {
     # Combine all intermediate data.tables
     combined_data <- rbindlist(data_list, fill = TRUE)
 
-    # Clean and type-convert fields where necessary
-    combined_data[, `:=`(
-        Data = as.Date(Data, format = "%Y%m%d"),
-        Ora = as.integer(Ora),
-        Periodo = as.integer(Periodo)
+    if (!"Periodo" %in% colnames(combined_data)) {
+        combined_data[, `:=`(
+            Data = as.Date(Data, format = "%Y%m%d"),
+            Ora = as.integer(Ora),
+            Periodo = as.integer(Ora)
+        )]
+    } else {
+        combined_data[, `:=`(
+            Data = as.Date(Data, format = "%Y%m%d"),
+            Ora = as.integer(Ora),
+            Periodo = as.integer(Periodo)
+        )]
+    }
+
+    combined_data[, RESOLUTION_TYPE := fifelse(
+        .N == 24, "60M",
+        fifelse(.N == 96, "15M", "OTHER")
     )]
 
     # Tidy the data for analysis
     melted_data <- melt(
         combined_data,
-        id.vars = c("Data", "Ora", "Mercato", "Periodo"),
+        id.vars = c("Data", "Ora", "Mercato", "Periodo", "RESOLUTION_TYPE"),
         variable.name = "ZONE_VARIABLE",
         variable.factor = FALSE,
         value.name = "VALUE"
@@ -1335,17 +1359,29 @@ gme_mb_tl_xml_to_data <- function(xml_file_path) {
     # Combine all intermediate data.tables
     combined_data <- rbindlist(data_list, fill = TRUE)
 
-    # Clean and type-convert fields where necessary
-    combined_data[, `:=`(
-        Data = as.Date(Data, format = "%Y%m%d"),
-        Ora = as.integer(Ora),
-        Periodo = as.integer(Periodo)
+    if (!"Periodo" %in% colnames(combined_data)) {
+        combined_data[, `:=`(
+            Data = as.Date(Data, format = "%Y%m%d"),
+            Ora = as.integer(Ora),
+            Periodo = as.integer(Ora)
+        )]
+    } else {
+        combined_data[, `:=`(
+            Data = as.Date(Data, format = "%Y%m%d"),
+            Ora = as.integer(Ora),
+            Periodo = as.integer(Periodo)
+        )]
+    }
+
+    combined_data[, RESOLUTION_TYPE := fifelse(
+        .N == 24, "60M",
+        fifelse(.N == 96, "15M", "OTHER")
     )]
 
     # Tidy the data for analysis
     melted_data <- melt(
         combined_data,
-        id.vars = c("Data", "Ora", "Mercato", "Periodo"),
+        id.vars = c("Data", "Ora", "Mercato", "Periodo", "RESOLUTION_TYPE"),
         variable.name = "ZONE_VARIABLE",
         variable.factor = FALSE,
         value.name = "VALUE"
@@ -1364,6 +1400,10 @@ gme_mb_tl_xml_to_data <- function(xml_file_path) {
     melted_data[, ZONE_VARIABLE := NULL]
     melted_data[, TIME := paste0(sprintf("%02d", as.numeric(Ora)), ":00")]
     setnames(melted_data, c('Data', 'Mercato', 'Ora', 'Periodo'), c('DATE', 'MARKET', 'HOUR', 'PERIOD'))
+    melted_data[, RESOLUTION_TYPE := fifelse(
+        .N == 24, "60M",
+        fifelse(.N == 96, "15M", "OTHER")
+    ), by = MARKET]
     melted_data[, MARKET := 'MB Totali']
 
     return(melted_data)
