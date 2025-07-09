@@ -21,5 +21,4 @@
 #' full_mappings[ZONE == "DE_50HZ"]
 #'
 #' @keywords dataset
-#' @export
 "full_mappings"
