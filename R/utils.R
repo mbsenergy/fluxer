@@ -1,3 +1,45 @@
+#' Install the `flux_lseg` Python Package in a Virtual Environment
+#'
+#' Installs the bundled `flux_lseg` Python package (provided as a `.tar.gz` file
+#' under `inst/python/`) into a Python virtual environment using the `reticulate` package.
+#'
+#' @param env Optional. The name or path of an existing Python virtual environment.
+#' If `NULL`, a new virtual environment named `"fluxenv"` is created using the default Python.
+#'
+#' @return No return value. The function performs the installation as a side effect and prints a success message.
+#'
+#' @details
+#' included in the R package under `inst/python/`. It uses `reticulate::virtualenv_install()` to
+#' install the package via `pip`.
+#'
+#' Python 3 must be available. You can specify the Python path by setting the `RETICULATE_PYTHON`
+#' environment variable or using `reticulate::use_python()` prior to calling this function.
+#'
+#' @importFrom reticulate virtualenv_create virtualenv_install use_virtualenv import
+#' @export
+install_flux_entsoe <- function(env = NULL) {
+  if (!requireNamespace("reticulate", quietly = TRUE)) {
+    stop("The 'reticulate' package is required.")
+  }
+
+  if (is.null(env)) {
+    env = reticulate::virtualenv_create("entenv")
+  }
+
+  if (!reticulate::virtualenv_exists(env)) {
+    reticulate::virtualenv_create(env)
+    reticulate::virtualenv_install(env, packages = c("pandas", "entsoe-py"))
+  }
+
+  reticulate::use_virtualenv(env, required = TRUE)
+
+  # Import Python modules
+  pandas = reticulate::import("pandas", delay_load = TRUE)
+  entsoe = reticulate::import("entsoe", delay_load = TRUE)
+
+  message("entsoe-py installed in virtualenv: ", env)
+}
+
 #' Make an API Request to ENTSO-E Web API
 #'
 #' This function sends a request to the ENTSO-E (European Network of Transmission System Operators for Electricity) Web API, retrieves data based on the given query, and processes the response. It handles both XML and zip file responses.
@@ -36,11 +78,11 @@
 #' @import stringr
 #' @export
 api_req <- function(
-    api_scheme = "https://",
-    api_domain = "web-api.tp.entsoe.eu/",
-    api_name = "api?",
-    query_string = NULL,
-    api_key = NULL
+  api_scheme = "https://",
+  api_domain = "web-api.tp.entsoe.eu/",
+  api_name = "api?",
+  query_string = NULL,
+  api_key = NULL
 ) {
   if (is.null(query_string)) {
     stop("The argument 'query_string' is missing!")
@@ -50,7 +92,11 @@ api_req <- function(
   } else {
     # add the canonical API prefix and suffix to the request url
     url <- paste0(
-      api_scheme, api_domain, api_name, query_string, "&securityToken="
+      api_scheme,
+      api_domain,
+      api_name,
+      query_string,
+      "&securityToken="
     )
     message(url, "<...>")
   }
@@ -61,15 +107,15 @@ api_req <- function(
     httr::write_memory()
   )
 
-  if (is.integer(httr::status_code(resp))) message("response has arrived")
+  if (is.integer(httr::status_code(resp))) {
+    message("response has arrived")
+  }
 
   # if the get request is successful, then ...
   if (httr::status_code(resp) == "200") {
-
     # if the request is a zip file, then ...
     rhct <- resp$headers$`content-type`
     if (rhct == "application/zip") {
-
       # redownload again, but into disk this time
       temp_file_path <- tempfile(fileext = ".zip")
       resp <- httr::GET(
@@ -83,23 +129,16 @@ api_req <- function(
 
       # return with the xml content list
       return(en_cont_list)
-
     } else if (rhct %in% c("text/xml", "application/xml")) {
-
       # read the xml content from the response
       en_cont <- httr::content(resp, encoding = "UTF-8")
 
       # return with the xml content
       return(en_cont)
-
     } else {
-
       stop("Not known response content-type: ", resp$headers$`content-type`)
-
     }
-
   } else {
-
     # extract reason from reason text
     response_reason <- resp |>
       httr::content(encoding = "utf-8") |>
@@ -125,7 +164,6 @@ api_req <- function(
 
     # if offset usage needed, then ...
     if (isTRUE(offset_needed) && isTRUE(offset_allowed)) {
-
       # calculate offset URLs
       offset_query_strings <- calc_offset_urls(
         reason = response_reason,
@@ -135,7 +173,7 @@ api_req <- function(
       # recursively call the api_req() function itself
       en_cont_list <- offset_query_strings |>
         purrr::map(
-          ~api_req(
+          ~ api_req(
             query_string = .x,
             api_key = api_key
           )
@@ -143,13 +181,9 @@ api_req <- function(
         unlist(recursive = FALSE)
 
       return(en_cont_list)
-
     } else {
-
       stop(httr::content(resp, encoding = "UTF-8"))
-
     }
-
   }
 }
 
@@ -189,7 +223,10 @@ api_req <- function(
 extract_xml_dam_data <- function(xml_data) {
   # Define the namespace
   ns <- xml_ns(xml_data)
-  ns <- c(ns, default = "urn:iec62325.351:tc57wg16:451-3:publicationdocument:7:3")
+  ns <- c(
+    ns,
+    default = "urn:iec62325.351:tc57wg16:451-3:publicationdocument:7:3"
+  )
 
   # Find all TimeSeries elements
   time_series <- xml_find_all(xml_data, ".//default:TimeSeries", ns = ns)
@@ -204,25 +241,52 @@ extract_xml_dam_data <- function(xml_data) {
 
     for (period in periods) {
       # Extract start and end times
-      time_interval <- xml_find_first(period, ".//default:timeInterval", ns = ns)
-      start_time <- xml_text(xml_find_first(time_interval, ".//default:start", ns = ns))
-      end_time <- xml_text(xml_find_first(time_interval, ".//default:end", ns = ns))
-      resolution <- xml_text(xml_find_first(period, ".//default:resolution", ns = ns))
+      time_interval <- xml_find_first(
+        period,
+        ".//default:timeInterval",
+        ns = ns
+      )
+      start_time <- xml_text(xml_find_first(
+        time_interval,
+        ".//default:start",
+        ns = ns
+      ))
+      end_time <- xml_text(xml_find_first(
+        time_interval,
+        ".//default:end",
+        ns = ns
+      ))
+      resolution <- xml_text(xml_find_first(
+        period,
+        ".//default:resolution",
+        ns = ns
+      ))
 
       # Extract Points (position and price.amount)
       points <- xml_find_all(period, ".//default:Point", ns = ns)
       for (point in points) {
-        position <- as.numeric(xml_text(xml_find_first(point, ".//default:position", ns = ns)))
-        price <- as.numeric(xml_text(xml_find_first(point, ".//default:price.amount", ns = ns)))
+        position <- as.numeric(xml_text(xml_find_first(
+          point,
+          ".//default:position",
+          ns = ns
+        )))
+        price <- as.numeric(xml_text(xml_find_first(
+          point,
+          ".//default:price.amount",
+          ns = ns
+        )))
 
         # Add to data list
-        data_list <- append(data_list, list(data.frame(
-          StartTime = start_time,
-          EndTime = end_time,
-          Position = position,
-          Resolution = resolution,
-          Price = price
-        )))
+        data_list <- append(
+          data_list,
+          list(data.frame(
+            StartTime = start_time,
+            EndTime = end_time,
+            Position = position,
+            Resolution = resolution,
+            Price = price
+          ))
+        )
       }
     }
   }
@@ -235,10 +299,9 @@ extract_xml_dam_data <- function(xml_data) {
 }
 
 
-
 #' Check if a Date is a Holiday
 #'
-#' This function determines if a given date is a holiday based on a fixed list of holidays, weekends, 
+#' This function determines if a given date is a holiday based on a fixed list of holidays, weekends,
 #' or the day after Easter.
 #'
 #' @param date A `Date` object representing the date to check.
@@ -293,7 +356,10 @@ is_holiday <- function(date) {
   formatted_date <- format(date, "%d-%m")
   easter_date <- as.Date(Easter(year(date)))
 
-  return(formatted_date %in% feste ||
-           weekdays(date) %in% c("Saturday", "Sunday") ||
-           (easter_date + 1) == date)
+  return(
+    formatted_date %in%
+      feste ||
+      weekdays(date) %in% c("Saturday", "Sunday") ||
+      (easter_date + 1) == date
+  )
 }

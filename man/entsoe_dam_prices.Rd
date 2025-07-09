@@ -2,62 +2,43 @@
 % Please edit documentation in R/entsoe_api.R
 \name{entsoe_dam_prices}
 \alias{entsoe_dam_prices}
-\title{Retrieve Day-Ahead Market Prices for a Specific Country}
+\title{Download ENTSO-E Day-Ahead Market Prices}
 \usage{
-entsoe_dam_prices(
-  country,
-  from_data,
-  to_data,
-  api_key = Sys.getenv("ENTSOE_KEY"),
-  verbose = FALSE,
-  plot = FALSE
-)
+entsoe_dam_prices(country, from_data, to_data)
 }
 \arguments{
-\item{country}{A character string specifying the country for which to retrieve DAM prices. The country should match an entry in the \code{entsoe_countries} table.}
+\item{country}{Character. ENTSO-E EIC code for the bidding zone (e.g., \code{"10YDE-VE-------2"} for 50Hertz).}
 
-\item{from_data}{A Date object specifying the start date for the data range. Default is 365 days before the current date.}
+\item{from_data}{Character or Date. Start date of the query in \code{"YYYY-MM-DD"} format.}
 
-\item{to_data}{A Date object specifying the end date for the data range. Default is the current date.}
-
-\item{api_key}{A character string containing the ENTSOE API key. It can be passed directly or retrieved from the environment variable \code{ENTSOE_KEY}.}
+\item{to_data}{Character or Date. End date of the query in \code{"YYYY-MM-DD"} format.}
 }
 \value{
-A \code{data.table} containing the formatted DAM price data for the specified country and time range. The data table includes:
-\itemize{
-\item \code{DATE}: The date in \code{YYYY-MM-DD} format.
-\item \code{HOUR}: The hour of the day (position in the data).
-\item \code{VALUE}: The price value in EUR.
-\item \code{UNIT}: The unit of the price (always 'EUR').
+A \code{data.table} with the columns:
+\describe{
+\item{ENTSOE_CODE}{The country EIC code used in the query.}
+\item{DATE}{Date of the price (class \code{IDate}).}
+\item{TIME}{Hour of the day as a string (\code{"HH:MM:SS"}).}
+\item{HOUR}{Hour of the day as an integer (0–23).}
+\item{VALUE}{Price in EUR/MWh.}
+\item{UNIT}{Price unit (always \code{"€/MWh"}).}
 }
 
-A \code{data.table} containing the formatted DAM price data for the specified country and time range. The data table includes:
-\itemize{
-\item \code{DATE}: The date in \code{YYYY-MM-DD} format.
-\item \code{HOUR}: The hour of the day (position in the data).
-\item \code{VALUE}: The price value in EUR.
-\item \code{UNIT}: The unit of the price (always 'EUR').
-}
+If the download fails or returns no data, returns \code{NULL} and displays a colored warning message.
 }
 \description{
-This function retrieves Day-Ahead Market (DAM) prices for a specific country from the ENTSOE Transparency Platform API.
-The function fetches market price data for a given time range and country, processes the data, and formats it into a \code{data.table}.
-
-This function retrieves Day-Ahead Market (DAM) prices for a specific country from the ENTSOE Transparency Platform API.
-The function fetches market price data for a given time range and country, processes the data, and formats it into a \code{data.table}.
+Retrieves day-ahead electricity market prices for a given ENTSO-E bidding zone and date range
+using the \code{entsoe-py} Python package through \code{reticulate}.
+}
+\details{
+Requires an environment variable \code{ENTSOE_KEY} to be set with a valid ENTSO-E API key.
+Automatically creates and manages a virtual Python environment to run \code{entsoe-py}.
 }
 \examples{
-# Example usage to retrieve DAM prices for Italy (North)
-country <- "Italy (North)"
-from_data <- Sys.Date() - 365
-to_data <- Sys.Date()
-dam_prices <- entsoe_dam_prices(country, from_data, to_data, api_key = Sys.getenv('ENTSOE_KEY'))
-print(dam_prices)
+\dontrun{
+Sys.setenv(ENTSOE_KEY = "your_api_key")
+prices = entsoe_dam_prices("10YDE-VE-------2", "2024-01-01", "2024-01-05")
+print(prices)
+}
 
-# Example usage to retrieve DAM prices for Italy (North)
-country <- "Italy (North)"
-from_data <- Sys.Date() - 365
-to_data <- Sys.Date()
-dam_prices <- entsoe_dam_prices(country, from_data, to_data, api_key = Sys.getenv('ENTSOE_KEY'))
-print(dam_prices)
 }

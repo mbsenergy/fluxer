@@ -3,18 +3,25 @@ import pandas as pd
 
 ENTSOE_KEY = "4e2c5951-f4e9-48f6-92af-b083178b0a89"
 
-client = EntsoePandasClient(api_key=ENTSOE_KEY)
-
-start = pd.Timestamp("20171201", tz="Europe/Brussels")
-end = pd.Timestamp("20180101", tz="Europe/Brussels")
-country_code = "BE"  # Belgium
-type_marketagreement_type = "A01"
-contract_marketagreement_type = "A01"
-process_type = "A51"
+start = pd.Timestamp("20170101", tz="Europe/Brussels")
+end = pd.Timestamp("20170201", tz="Europe/Brussels")
+country_code = "10YIT-GRTN-----B"
 
 # methods that return Pandas Series
-df_dam = client.query_day_ahead_prices(country_code, start=start, end=end)
+client = EntsoePandasClient(api_key=ENTSOE_KEY)
+# df_dam = client.query_day_ahead_prices(country_code, start=start, end=end)
+# df_dam = df_dam.reset_index()
+# df_dam.columns = ['datetime', 'price']
+# df_dam['date'] = df_dam['datetime'].dt.date
+# df_dam['hour'] = df_dam['datetime'].dt.hour
+# df_dam = df_dam[['date', 'hour', 'price']]
+
+
 df_gen = client.query_generation(country_code, start=start, end=end, psr_type=None)
+df_gen = df_gen.reset_index()
+
+
+
 df_cap = client.query_installed_generation_capacity(
     country_code, start=start, end=end, psr_type=None
 )
@@ -25,6 +32,24 @@ df_phy_im = client.query_physical_crossborder_allborders(
 df_phy_ex = client.query_physical_crossborder_allborders(
     country_code, start, end, export=True
 )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # client.query_net_position(country_code, start=start, end=end, dayahead=True)
 # client.query_crossborder_flows(country_code_from, country_code_to, start=start, end=end)

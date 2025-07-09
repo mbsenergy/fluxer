@@ -47,3 +47,4 @@ po/*~
 rsconnect/
 _quarto/*
 !_quarto/_freeze/
+.python-version
