@@ -4,7 +4,12 @@
 \alias{entsoe_dam_prices}
 \title{Download ENTSO-E Day-Ahead Market Prices}
 \usage{
-entsoe_dam_prices(country, from_data, to_data)
+entsoe_dam_prices(
+  country,
+  from_data,
+  to_data,
+  api_key = Sys.getenv("ENTSOE_KEY")
+)
 }
 \arguments{
 \item{country}{Character. ENTSO-E EIC code for the bidding zone (e.g., \code{"10YDE-VE-------2"} for 50Hertz).}
@@ -12,6 +17,8 @@ entsoe_dam_prices(country, from_data, to_data)
 \item{from_data}{Character or Date. Start date of the query in \code{"YYYY-MM-DD"} format.}
 
 \item{to_data}{Character or Date. End date of the query in \code{"YYYY-MM-DD"} format.}
+
+\item{api_key}{Character with you personal ENTSOE API Key.}
 }
 \value{
 A \code{data.table} with the columns:

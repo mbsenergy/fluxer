@@ -4,7 +4,12 @@
 \alias{entsoe_actual_generation}
 \title{Download Actual Generation Data from ENTSO-E Transparency Platform}
 \usage{
-entsoe_actual_generation(country, from_data, to_data)
+entsoe_actual_generation(
+  country,
+  from_data,
+  to_data,
+  api_key = Sys.getenv("ENTSOE_KEY")
+)
 }
 \arguments{
 \item{country}{Character. ENTSO-E bidding zone code (e.g., \code{"IT_CALA"} for South Italy).}
@@ -12,6 +17,8 @@ entsoe_actual_generation(country, from_data, to_data)
 \item{from_data}{Character or Date. Start date in \code{"YYYY-MM-DD"} or \code{"YYYYMMDD"} format.}
 
 \item{to_data}{Character or Date. End date in \code{"YYYY-MM-DD"} or \code{"YYYYMMDD"} format.}
+
+\item{api_key}{Character with you personal ENTSOE API Key.}
 }
 \value{
 A \code{data.table} with columns:

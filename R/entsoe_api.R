@@ -19,6 +19,7 @@
 #' @param country Character. ENTSO-E EIC code for the bidding zone (e.g., `"10YDE-VE-------2"` for 50Hertz).
 #' @param from_data Character or Date. Start date of the query in `"YYYY-MM-DD"` format.
 #' @param to_data Character or Date. End date of the query in `"YYYY-MM-DD"` format.
+#' @param api_key Character with you personal ENTSOE API Key.
 #'
 #' @return A `data.table` with the columns:
 #' \describe{
@@ -48,7 +49,7 @@
 #' }
 #'
 #' @export
-entsoe_dam_prices = function(country, from_data, to_data) {
+entsoe_dam_prices = function(country, from_data, to_data, api_key = Sys.getenv("ENTSOE_KEY")) {
   # Format timestamps
   start = from_data
   end = to_data
@@ -148,6 +149,7 @@ except Exception as e:
 #' @param country Character. ENTSO-E bidding zone code (e.g., `"IT_CALA"` for South Italy).
 #' @param from_data Character or Date. Start date in `"YYYY-MM-DD"` or `"YYYYMMDD"` format.
 #' @param to_data Character or Date. End date in `"YYYY-MM-DD"` or `"YYYYMMDD"` format.
+#' @param api_key Character with you personal ENTSOE API Key.
 #'
 #' @return A `data.table` with columns:
 #' \describe{
@@ -170,7 +172,7 @@ except Exception as e:
 #' }
 #'
 #' @export
-entsoe_actual_generation = function(country, from_data, to_data) {
+entsoe_actual_generation = function(country, from_data, to_data, api_key = Sys.getenv("ENTSOE_KEY")) {
   # Format timestamps
   start = from_data
   end = to_data

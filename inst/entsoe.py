@@ -5,7 +5,7 @@ ENTSOE_KEY = "4e2c5951-f4e9-48f6-92af-b083178b0a89"
 
 start = pd.Timestamp("20170101", tz="Europe/Brussels")
 end = pd.Timestamp("20170201", tz="Europe/Brussels")
-country_code = "10YIT-GRTN-----B"
+country_code = "IT_CSUD"
 
 # methods that return Pandas Series
 client = EntsoePandasClient(api_key=ENTSOE_KEY)
@@ -18,7 +18,6 @@ client = EntsoePandasClient(api_key=ENTSOE_KEY)
 
 
 df_gen = client.query_generation(country_code, start=start, end=end, psr_type=None)
-df_gen = df_gen.reset_index()
 
 
 
