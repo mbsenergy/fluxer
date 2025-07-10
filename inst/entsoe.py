@@ -18,8 +18,12 @@ client = EntsoePandasClient(api_key=ENTSOE_KEY)
 
 
 df_gen = client.query_generation(country_code, start=start, end=end, psr_type=None)
-
-
+idx = pd.IndexSlice
+df_agg = df_gen.loc[:, idx[:, "Actual Aggregated"]]
+df_agg.columns = df_agg.columns.droplevel(1)
+df_agg = df_agg.reset_index()
+df_long = df_agg.melt("index", var_name="generation_type", value_name="value")
+df_long
 
 df_cap = client.query_installed_generation_capacity(
     country_code, start=start, end=end, psr_type=None
@@ -31,23 +35,6 @@ df_phy_im = client.query_physical_crossborder_allborders(
 df_phy_ex = client.query_physical_crossborder_allborders(
     country_code, start, end, export=True
 )
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 # client.query_net_position(country_code, start=start, end=end, dayahead=True)

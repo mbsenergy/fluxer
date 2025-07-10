@@ -193,8 +193,12 @@ try:
     start = pd.Timestamp('%s', tz='Europe/Brussels')
     end = pd.Timestamp('%s', tz='Europe/Brussels')
     client = EntsoePandasClient(api_key='%s')
-    df_series = client.query_generation('%s', start=start, end=end, psr_type=None)
-    df = df_series.reset_index()
+    df = client.query_generation('%s', start=start, end=end, psr_type=None)
+    idx = pd.IndexSlice
+    df = df.loc[:, idx[:, 'Actual Aggregated']]
+    df.columns = df.columns.droplevel(1)
+    df = df.reset_index()
+    df = df.melt('index', var_name='generation_type', value_name='value')
     error_msg = ''
 except Exception as e:
     df = None
@@ -229,12 +233,7 @@ except Exception as e:
   }
 
   setDT(dts)
-  dts = melt(
-    dts,
-    id.vars = 'index',
-    variable.name = 'PRODUCTION_TYPE',
-    value.name = 'VALUE'
-  )
+  setnames(dts, c('index', 'PRODUCTION_TYPE', 'VALUE'))
 
   dts[,
     c("DATE", "TIME", "HOUR") := .(
