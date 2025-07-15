@@ -865,6 +865,7 @@ gme_mi_get_files <- function(data_type, output_dir = "data",
 #' @details
 #' The function checks for valid file name format and supported `data_type`. After downloading,
 #' it calls the appropriate parser: `gme_mi_price_xml_to_data()` or `gme_mi_qty_x
+#' @export
 mi_download_file <- function(filename, data_type = 'MI-A1_Prezzi', output_dir, username, password, raw = FALSE) {
 
     allowed_data_types = c('MI-A1_Prezzi', 'MI-A2_Prezzi', 'MI-A3_Prezzi', 
