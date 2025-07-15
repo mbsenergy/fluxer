@@ -35,6 +35,6 @@ It can filter files based on the provided \code{data_type}.
 }
 \examples{
 \dontrun{
-files <- gme_mgp_get_files(data_type = "MGP_Prezzi", verbose = TRUE)
+files <- gme_rest_get_files(data_type = "MGP_Prezzi", verbose = TRUE)
 }
 }

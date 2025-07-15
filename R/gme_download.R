@@ -421,6 +421,7 @@ gme_dam_quantity_xml_to_data <- function(xml_file_path) {
 
 
 
+
 #' Process GME DAM Fabbisogno XML Data
 #'
 #' This function processes a GME Day-Ahead Market (DAM) fabissogno XML file and extracts
@@ -758,6 +759,414 @@ gme_dam_limtran_xml_to_data <- function(xml_file_path) {
 
 
 
+
+# MI ----------------------------------------------------------------------------------------------
+
+#' Retrieve List of Available GME MI Market XML Files from FTP
+#'
+#' Connects to the GME FTP server and lists available XML files for MI-A1, MI-A2, or MI-A3 
+#' market sessions (prices or quantities). Filters files by the appropriate naming pattern.
+#'
+#' @param data_type Character string specifying the type of data to retrieve. Must be one of: 
+#'   `"MI-A1_Prezzi"`, `"MI-A2_Prezzi"`, `"MI-A3_Prezzi"`, 
+#'   `"MI-A1_Quantita"`, `"MI-A2_Quantita"`, `"MI-A3_Quantita"`.
+#' @param output_dir Directory path to store the files (not used in this version, but directory is ensured to exist). 
+#'   Defaults to `"data"`.
+#' @param username FTP username. Default is `"PIASARACENO"`.
+#' @param password FTP password. Default is `"18N15C9R"`.
+#' @param verbose Logical; if `TRUE`, prints the list of matched files. Default is `FALSE`.
+#'
+#' @return A character vector of filenames matching the `data_type` on the FTP server.
+#'   Returns `NULL` in case of an error.
+#'
+#' @examples
+#' \dontrun{
+#' files <- gme_mi_get_files(data_type = "MI-A1_Prezzi", verbose = TRUE)
+#' }
+#'
+#' @export
+gme_mi_get_files <- function(data_type, output_dir = "data",
+                              username = "PIASARACENO", password = "18N15C9R",
+                              verbose = FALSE) {
+
+    allowed_data_types = c('MI-A1_Prezzi', 'MI-A2_Prezzi', 'MI-A3_Prezzi', 
+                           'MI-A1_Quantita', 'MI-A2_Quantita', 'MI-A3_Quantita')
+
+    # Validate data_type
+    if (!data_type %in% allowed_data_types) {
+        stop(paste("Invalid data_type:", data_type,
+                   ". Must be one of:", paste(allowed_data_types, collapse = ", ")))
+    }
+
+    url_base = paste0('ftp://download.mercatoelettrico.org/MercatiElettrici/', data_type, '/')
+
+    if (data_type == "MI-A1_Prezzi") {file_pattern = "\\S+MI-A1Prezzi\\.xml$"}
+    if (data_type == "MI-A2_Prezzi") {file_pattern = "\\S+MI-A2Prezzi\\.xml$"}
+    if (data_type == "MI-A3_Prezzi") {file_pattern = "\\S+MI-A3Prezzi\\.xml$"}
+    if (data_type == "MI-A1_Quantita") {file_pattern = "\\S+MI-A1Quantita\\.xml$"}
+    if (data_type == "MI-A2_Quantita") {file_pattern = "\\S+MI-A2Quantita\\.xml$"}
+    if (data_type == "MI-A3_Quantita") {file_pattern = "\\S+MI-A3Quantita\\.xml$"}
+
+    # Ensure output directory exists
+    if (!dir.exists(output_dir)) {
+        dir.create(output_dir, recursive = TRUE)
+    }
+
+    # List files on the FTP server
+    tryCatch({
+        ftp_list_cmd <- paste0("curl -u ", username, ":", password, " ", url_base)
+        file_list <- system(ftp_list_cmd, intern = TRUE)
+        matches <- regexpr(file_pattern, file_list)
+        files <- regmatches(file_list, matches)
+        files <- files[nzchar(files)]
+
+        # Print available files
+        if(isTRUE(verbose)) {
+            message(crayon::green("Available files:"))
+            print(files)
+        }
+        message(crayon::green("[OK] Available files download."))
+        return(files)
+    }, error = function(e) {
+        message(crayon::red("[ERROR] Error downloading filenames from GME directory", e$message))
+        return(NULL)
+    })
+    return(files)
+}
+
+
+#' Download and Parse GME MI Market XML File
+#'
+#' Downloads an XML file from the GME (Gestore dei Mercati Energetici) FTP server for the MI-A market,
+#' validates the filename and data type, and optionally parses the file into a `data.table`.
+#'
+#' @param filename Character. Filename of the XML to download (must be 8-digit date + `.xml`, e.g. `"20240710.xml"`).
+#' @param data_type Character. Type of data to download. One of: `"MI-A1_Prezzi"`, `"MI-A2_Prezzi"`, `"MI-A3_Prezzi"`, 
+#' `"MI-A1_Quantita"`, `"MI-A2_Quantita"`, `"MI-A3_Quantita"`.
+#' @param output_dir Character. Local directory to store the downloaded XML file temporarily.
+#' @param username Character. Username for GME FTP access.
+#' @param password Character. Password for GME FTP access.
+#' @param raw Logical. If `TRUE`, returns only `TRUE` if the file is downloaded successfully, without parsing it. Default is `FALSE`.
+#'
+#' @return If `raw = FALSE`, a `data.table` containing parsed data from the XML file, in long format, with standard columns:
+#' \describe{
+#'   \item{DATE}{Date of the transaction}
+#'   \item{TIME}{Hour formatted as `"HH:00"`}
+#'   \item{HOUR}{Integer hour (1–24)}
+#'   \item{MARKET}{Market session (e.g. `"MI-A1"`)}
+#'   \item{ZONE}{Zone or interconnection code (e.g. `"CNOR_ACQUISTI"`)}
+#'   \item{VALUE}{Numeric value (MWh or EUR/MWh)}
+#'   \item{UNIT}{Measurement unit (`"MWh"` or `"€/MWh"`)}
+#'   \item{VARIABLE}{Only in MI-A3 Quantita, type of quantity (e.g. `"MODULAZIONE"`)}
+#' }
+#'
+#' If `raw = TRUE`, returns `TRUE` if download was successful. If there is an error, returns `NULL`.
+#'
+#' @details
+#' The function checks for valid file name format and supported `data_type`. After downloading,
+#' it calls the appropriate parser: `gme_mi_price_xml_to_data()` or `gme_mi_qty_x
+mi_download_file <- function(filename, data_type = 'MI-A1_Prezzi', output_dir, username, password, raw = FALSE) {
+
+    allowed_data_types = c('MI-A1_Prezzi', 'MI-A2_Prezzi', 'MI-A3_Prezzi', 
+                           'MI-A1_Quantita', 'MI-A2_Quantita', 'MI-A3_Quantita')
+  
+    # Validate data_type
+    if (!data_type %in% allowed_data_types) {
+        stop(paste("Invalid data_type:", data_type,
+                   ". Must be one of:", paste(allowed_data_types, collapse = ", ")))
+    }
+  
+    # Validate filename
+    validated_filename = gme_validate_filename(filename = filename, num_digits = 8, file_extension = "xml")
+    if(isTRUE(validated_filename)) {
+  
+    # Construct the file URL
+  
+    url_base = paste0('ftp://download.mercatoelettrico.org/MercatiElettrici/', data_type, '/')
+    file_url <- paste0(url_base, filename)
+  
+    # Construct the output file path
+    output_file <- file.path(output_dir, filename)
+  
+    # Create a curl handle
+    h <- curl::new_handle()
+    curl::handle_setopt(h,
+                        .list = list(
+                            userpwd = paste0(username, ":", password),
+                            ftp_use_epsv = TRUE))  # Use passive mode for FTP
+  
+    # Perform the download and process the XML file
+    result_df <- tryCatch({
+        curl::curl_download(file_url, output_file, handle = h)
+  
+        # Check if the download was successful
+        message(crayon::green("File downloaded successfully: ", output_file))
+  
+        # Process the downloaded XML file
+        if (isFALSE(raw)) {
+            if (data_type == 'MI-A1_Prezzi') {
+                result_df <- gme_mi_price_xml_to_data(output_file)
+                setcolorder(result_df, c('DATE', 'TIME', 'HOUR', 'MARKET', 'ZONE', 'VALUE', 'UNIT'))
+            }
+            if (data_type == 'MI-A2_Prezzi') {
+                result_df <- gme_mi_price_xml_to_data(output_file)
+                setcolorder(result_df, c('DATE', 'TIME', 'HOUR', 'MARKET', 'ZONE', 'VALUE', 'UNIT'))
+            }
+            if (data_type == 'MI-A3_Prezzi') {
+                result_df <- gme_mi_price_xml_to_data(output_file)
+                setcolorder(result_df, c('DATE', 'TIME', 'HOUR', 'MARKET', 'ZONE', 'VALUE', 'UNIT'))
+            }
+            if (data_type == 'MI-A1_Quantita') {
+                result_df <- gme_mi_qty_xml_to_data(output_file)
+                setcolorder(result_df, c('DATE', 'TIME', 'HOUR', 'MARKET', 'ZONE', 'VALUE', 'UNIT'))
+            }
+            if (data_type == 'MI-A2_Quantita') {
+                result_df <- gme_mi_qty_xml_to_data(output_file)
+                setcolorder(result_df, c('DATE', 'TIME', 'HOUR', 'MARKET', 'ZONE', 'VALUE', 'UNIT'))
+            }
+            if (data_type == 'MI-A3_Quantita') {
+                result_df <- gme_mi_qty_xml_to_data(output_file)
+                setcolorder(result_df, c('DATE', 'TIME', 'HOUR', 'MARKET', 'ZONE', 'VALUE', 'UNIT'))
+            }
+            # Optionally remove the downloaded file after processing
+        } else {
+            result_df <- FALSE
+        }
+  
+        result_df
+    }, error = function(e) {
+        # Handle errors (e.g., failed download or XML processing)
+        message(crayon::red("[ERROR] Error downloading file: ", filename, " - ", e$message))
+        result_df = NULL
+        result_df
+    })
+  
+    if (is.null(result_df)) {
+        message(crayon::red("[ERROR] An error occurred; result_df is NULL."))
+    } else {
+        message(crayon::green("[OK] Processing completed successfully."))
+    }
+  
+    if(isFALSE(raw)) {
+        file.remove(output_file)
+        return(result_df)
+    } else {
+        message(paste(crayon::green("[OK] XML File at:", output_file)))
+        return(TRUE)
+    }
+  
+    } else {
+        message(crayon::red("[ERROR] Wrong Filename"))
+    }
+  }
+  
+
+#' Download and Parse GME MI Market XML File
+#'
+#' Downloads an XML file from the GME (Gestore dei Mercati Energetici) FTP server for the MI-A market,
+#' validates the filename and data type, and optionally parses the file into a `data.table`.
+#'
+#' @param filename Character. Filename of the XML to download (must be 8-digit date + `.xml`, e.g. `"20240710.xml"`).
+#' @param data_type Character. Type of data to download. One of: `"MI-A1_Prezzi"`, `"MI-A2_Prezzi"`, `"MI-A3_Prezzi"`, 
+#' `"MI-A1_Quantita"`, `"MI-A2_Quantita"`, `"MI-A3_Quantita"`.
+#' @param output_dir Character. Local directory to store the downloaded XML file temporarily.
+#' @param username Character. Username for GME FTP access.
+#' @param password Character. Password for GME FTP access.
+#' @param raw Logical. If `TRUE`, returns only `TRUE` if the file is downloaded successfully, without parsing it. Default is `FALSE`.
+#'
+#' @return If `raw = FALSE`, a `data.table` containing parsed data from the XML file, in long format, with standard columns:
+#' \describe{
+#'   \item{DATE}{Date of the transaction}
+#'   \item{TIME}{Hour formatted as `"HH:00"`}
+#'   \item{HOUR}{Integer hour (1–24)}
+#'   \item{MARKET}{Market session (e.g. `"MI-A1"`)}
+#'   \item{ZONE}{Zone or interconnection code (e.g. `"CNOR_ACQUISTI"`)}
+#'   \item{VALUE}{Numeric value (MWh or EUR/MWh)}
+#'   \item{UNIT}{Measurement unit (`"MWh"` or `"€/MWh"`)}
+#'   \item{VARIABLE}{Only in MI-A3 Quantita, type of quantity (e.g. `"MODULAZIONE"`)}
+#' }
+#'
+#' If `raw = TRUE`, returns `TRUE` if the download was successful. If there is an error, returns `NULL`.
+#'
+#' @details
+#' The function checks that the `filename` is valid and that the `data_type` is among the allowed options.
+#' It then builds the FTP URL for the requested XML file and downloads it using `curl`.
+#' If `raw = FALSE`, the function parses the downloaded file using the appropriate parser:
+#' \itemize{
+#'   \item `gme_mi_price_xml_to_data()` for `"MI-A*_Prezzi"` types
+#'   \item `gme_mi_qty_xml_to_data()` for `"MI-A*_Quantita"` types
+#' }
+#' The parsed file is reshaped to a standard long format. If `raw = FALSE`, the downloaded file is deleted after parsing.
+#'
+#' @examples
+#' \dontrun{
+#' df = mi_download_file("20240710.xml", data_type = "MI-A1_Quantita",
+#'                       output_dir = tempdir(), username = "user", password = "pass")
+#' head(df)
+#' }
+#'
+#' @export
+
+gme_mi_price_xml_to_data <- function(xml_file_path) {
+
+    xml_data <- read_xml(xml_file_path)
+  
+    prezzi_nodes <- xml_find_all(xml_data, ".//Prezzi")
+  
+    # Extract the data from each 'Prezzi' element
+    data_list <- lapply(prezzi_nodes, function(node) {
+        data <- xml_text(xml_find_first(node, ".//Data"))
+        mercato <- xml_text(xml_find_first(node, ".//Mercato"))
+        ora <- xml_text(xml_find_first(node, ".//Ora"))
+        pun <- xml_text(xml_find_first(node, ".//PUN"))
+        nat <- xml_text(xml_find_first(node, ".//NAT"))
+        cala <- xml_text(xml_find_first(node, ".//CALA"))
+        cnor <- xml_text(xml_find_first(node, ".//CNOR"))
+        csud <- xml_text(xml_find_first(node, ".//CSUD"))
+        nord <- xml_text(xml_find_first(node, ".//NORD"))
+        sard <- xml_text(xml_find_first(node, ".//SARD"))
+        sici <- xml_text(xml_find_first(node, ".//SICI"))
+        sud <- xml_text(xml_find_first(node, ".//SUD"))
+        aust <- xml_text(xml_find_first(node, ".//AUST"))
+        coac <- xml_text(xml_find_first(node, ".//COAC"))
+        coup <- xml_text(xml_find_first(node, ".//COUP"))
+        cors <- xml_text(xml_find_first(node, ".//CORS"))
+        fran <- xml_text(xml_find_first(node, ".//FRAN"))
+        grec <- xml_text(xml_find_first(node, ".//GREC"))
+        slov <- xml_text(xml_find_first(node, ".//SLOV"))
+        sviz <- xml_text(xml_find_first(node, ".//SVIZ"))
+        bsp <- xml_text(xml_find_first(node, ".//BSP"))
+        malt <- xml_text(xml_find_first(node, ".//MALT"))
+        xaus <- xml_text(xml_find_first(node, ".//XAUS"))
+        xfra <- xml_text(xml_find_first(node, ".//XFRA"))
+        mont <- xml_text(xml_find_first(node, ".//MONT"))
+        xgre <- xml_text(xml_find_first(node, ".//XGRE"))
+  
+        # Return the extracted data as a named list
+        list(
+            Data = data, Mercato = mercato, Ora = ora, PUN = pun, NAT = nat, CALA = cala,
+            CNOR = cnor, CSUD = csud, NORD = nord, SARD = sard, SICI = sici, SUD = sud,
+            AUST = aust, COAC = coac, COUP = coup, CORS = cors, FRAN = fran, GREC = grec,
+            SLOV = slov, SVIZ = sviz, BSP = bsp, MALT = malt, XAUS = xaus, XFRA = xfra,
+            MONT = mont, XGRE = xgre
+        )
+    })
+  
+    # Convert the list into a data frame
+    data_df <- do.call(rbind, lapply(data_list, as.data.table))
+  
+    data_df[, Data := as.Date(Data, format = "%Y%m%d")]
+    data_df[, TIME := paste0(sprintf("%02d", as.numeric(Ora)), ":00")]
+    setnames(data_df, c('Data', 'Mercato', 'Ora'), c('DATE', 'MARKET', 'HOUR'))
+    data_df_lg <- melt(data_df, id.vars = c('DATE', 'TIME', 'HOUR', 'MARKET'), variable.factor = FALSE, variable.name = 'ZONE', value.name = 'VALUE')
+    data_df_lg[, VALUE := as.numeric(gsub(",", ".", VALUE))]
+    data_df_lg[, UNIT := 'EUR']
+  
+    data_df_lg = unique(data_df_lg)
+  
+    return(data_df_lg)
+  }
+
+
+#' Parse GME MI Quantità XML File to Long-Format Data Table
+#'
+#' Reads and parses a GME MI-A XML file containing traded quantities by market session 
+#' and geographical zones. The function extracts data from `<Quantita>` nodes and returns 
+#' a clean, long-format `data.table` with standardized zone identifiers and hourly values.
+#'
+#' @param xml_file_path Character string. Full path to the XML file containing MI-A market quantities.
+#'
+#' @return A `data.table` in long format with the following columns:
+#' \describe{
+#'   \item{DATE}{Date of the transaction (Date)}
+#'   \item{MARKET}{Market session name (e.g., "MI-A1")}
+#'   \item{HOUR}{Hour of the day (integer 1–24)}
+#'   \item{ZONE}{Zone identifier (e.g., "CNOR_ACQUISTI", "SUD_VENDITE")}
+#'   \item{VALUE}{Quantity traded (in MWh)}
+#'   \item{TIME}{Hour formatted as "HH:00"}
+#'   \item{UNIT}{Unit of the values, always `"MWh"`}
+#' }
+#'
+#' @details
+#' This function handles both domestic and international zones for *acquisti* (purchases) 
+#' and *vendite* (sales). Missing or unexpected fields are handled gracefully by `rbindlist(fill=TRUE)`.
+#' The decimal separator is normalized (`,` to `.`) before conversion to numeric.
+#'
+#' @examples
+#' \dontrun{
+#' file_path = "MI-A1_Quantita_20210922.xml"
+#' dt = gme_mi_qty_xml_to_data(file_path)
+#' head(dt)
+#' }
+#'
+#' @export
+gme_mi_qty_xml_to_data <- function(xml_file_path) {
+
+xml_data <- read_xml(xml_file_path)
+
+quantita_nodes <- xml_find_all(xml_data, ".//Quantita")
+
+# Extract the data from each 'Prezzi' element
+data_list <- lapply(quantita_nodes, function(node) {
+    data <- xml_text(xml_find_first(node, ".//Data"))
+    mercato <- xml_text(xml_find_first(node, ".//Mercato"))
+    ora <- xml_text(xml_find_first(node, ".//Ora"))
+
+    # Extract all quantity fields dynamically
+    quantity_fields <- xml_children(node)
+    quantities <- sapply(quantity_fields, function(child) {
+        value <- xml_text(child)
+        gsub(",", ".", value)  # Convert commas to dots for numeric conversion
+    })
+
+    # Combine extracted fields into a named list
+    c(list(Data = data, Mercato = mercato, Ora = ora), as.list(quantities))
+})
+
+# Convert the list of records into a data.table
+data_dt <- rbindlist(data_list, fill = TRUE)
+data_dt <- data_dt[, -(1:3), with = FALSE]
+
+# Standardize column names
+quantita_elements <- c('DATE', 'MARKET', 'HOUR',
+    "TOTALE_ACQUISTI", "NAT_ACQUISTI", "CALA_ACQUISTI", "CNOR_ACQUISTI",
+    "CSUD_ACQUISTI", "NORD_ACQUISTI", "SARD_ACQUISTI", "SICI_ACQUISTI",
+    "SUD_ACQUISTI", "AUST_ACQUISTI", "COAC_ACQUISTI", "COUP_ACQUISTI",
+    "CORS_ACQUISTI", "FRAN_ACQUISTI", "GREC_ACQUISTI", "SLOV_ACQUISTI",
+    "SVIZ_ACQUISTI", "BSP_ACQUISTI", "MALT_ACQUISTI", 
+    "MONT_ACQUISTI", "XGRE_ACQUISTI", "TOTALE_VENDITE",
+    "NAT_VENDITE", "CALA_VENDITE", "CNOR_VENDITE", "CSUD_VENDITE",
+    "NORD_VENDITE", "SARD_VENDITE", "SICI_VENDITE", "SUD_VENDITE",
+    "AUST_VENDITE", "COAC_VENDITE", "COUP_VENDITE", "CORS_VENDITE",
+    "FRAN_VENDITE", "GREC_VENDITE", "SLOV_VENDITE", "SVIZ_VENDITE",
+    "BSP_VENDITE", "MALT_VENDITE",
+    "MONT_VENDITE", "XGRE_VENDITE"
+)
+setnames(data_dt, names(data_dt), quantita_elements)
+
+# Reshape the data to long format
+data_dt_long <- melt(data_dt, id.vars = c("DATE", "MARKET", "HOUR"),
+                        variable.name = "ZONE", value.name = "VALUE",
+                    variable.factor = FALSE)
+
+# Convert DATE and HOUR to proper formats
+data_dt_long[, DATE := as.Date(DATE, format = "%Y%m%d")]
+data_dt_long[, HOUR := as.integer(HOUR)]
+data_dt_long[, TIME := paste0(sprintf("%02d", as.numeric(HOUR)), ":00")]
+data_dt_long[, VALUE := as.numeric(VALUE)]
+
+# Add unit for the values
+data_dt_long[, UNIT := "MWh"]
+
+data_dt_long = unique(data_dt_long)
+
+return(data_dt_long)
+}
+
+
+
+
+
 # OTHER MARKETS ------------------------------------------------------------------------------------------------------
 
 ## MSD ------------------------------------------------------------------------------------------------------
@@ -780,7 +1189,7 @@ gme_dam_limtran_xml_to_data <- function(xml_file_path) {
 #'         or NULL if an error occurs.
 #' @examples
 #' \dontrun{
-#' files <- gme_mgp_get_files(data_type = "MGP_Prezzi", verbose = TRUE)
+#' files <- gme_rest_get_files(data_type = "MGP_Prezzi", verbose = TRUE)
 #' }
 #' @export
 gme_rest_get_files <- function(data_type, output_dir = "data",
