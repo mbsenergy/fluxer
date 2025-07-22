@@ -1103,65 +1103,82 @@ gme_mi_price_xml_to_data <- function(xml_file_path) {
 #' @export
 gme_mi_qty_xml_to_data <- function(xml_file_path) {
 
-xml_data <- read_xml(xml_file_path)
+    xml_data <- read_xml(xml_file_path)
 
-quantita_nodes <- xml_find_all(xml_data, ".//Quantita")
+    quantita_nodes <- xml_find_all(xml_data, ".//Quantita")
 
-# Extract the data from each 'Prezzi' element
-data_list <- lapply(quantita_nodes, function(node) {
-    data <- xml_text(xml_find_first(node, ".//Data"))
-    mercato <- xml_text(xml_find_first(node, ".//Mercato"))
-    ora <- xml_text(xml_find_first(node, ".//Ora"))
+    # Extract the data from each 'Prezzi' element
+    data_list <- lapply(quantita_nodes, function(node) {
+        data <- xml_text(xml_find_first(node, ".//Data"))
+        mercato <- xml_text(xml_find_first(node, ".//Mercato"))
+        ora <- xml_text(xml_find_first(node, ".//Ora"))
 
-    # Extract all quantity fields dynamically
-    quantity_fields <- xml_children(node)
-    quantities <- sapply(quantity_fields, function(child) {
-        value <- xml_text(child)
-        gsub(",", ".", value)  # Convert commas to dots for numeric conversion
+        # Extract all quantity fields dynamically
+        quantity_fields <- xml_children(node)
+        quantities <- sapply(quantity_fields, function(child) {
+            value <- xml_text(child)
+            gsub(",", ".", value)  # Convert commas to dots for numeric conversion
+        })
+
+        # Combine extracted fields into a named list
+        c(list(Data = data, Mercato = mercato, Ora = ora), as.list(quantities))
     })
 
-    # Combine extracted fields into a named list
-    c(list(Data = data, Mercato = mercato, Ora = ora), as.list(quantities))
-})
+    # Convert the list of records into a data.table
+    data_dt <- rbindlist(data_list, fill = TRUE)
+    data_dt <- data_dt[, -(1:3), with = FALSE]
 
-# Convert the list of records into a data.table
-data_dt <- rbindlist(data_list, fill = TRUE)
-data_dt <- data_dt[, -(1:3), with = FALSE]
-
-# Standardize column names
-quantita_elements <- c('DATE', 'MARKET', 'HOUR',
+    if(ncol(data_dt) == 49) {
+    quantita_elements = c(
+    "DATE", "MARKET", "HOUR",
     "TOTALE_ACQUISTI", "NAT_ACQUISTI", "CALA_ACQUISTI", "CNOR_ACQUISTI",
     "CSUD_ACQUISTI", "NORD_ACQUISTI", "SARD_ACQUISTI", "SICI_ACQUISTI",
     "SUD_ACQUISTI", "AUST_ACQUISTI", "COAC_ACQUISTI", "COUP_ACQUISTI",
     "CORS_ACQUISTI", "FRAN_ACQUISTI", "GREC_ACQUISTI", "SLOV_ACQUISTI",
-    "SVIZ_ACQUISTI", "BSP_ACQUISTI", "MALT_ACQUISTI", 
-    "MONT_ACQUISTI", "XGRE_ACQUISTI", "TOTALE_VENDITE",
-    "NAT_VENDITE", "CALA_VENDITE", "CNOR_VENDITE", "CSUD_VENDITE",
-    "NORD_VENDITE", "SARD_VENDITE", "SICI_VENDITE", "SUD_VENDITE",
-    "AUST_VENDITE", "COAC_VENDITE", "COUP_VENDITE", "CORS_VENDITE",
-    "FRAN_VENDITE", "GREC_VENDITE", "SLOV_VENDITE", "SVIZ_VENDITE",
-    "BSP_VENDITE", "MALT_VENDITE",
-    "MONT_VENDITE", "XGRE_VENDITE"
-)
-setnames(data_dt, names(data_dt), quantita_elements)
+    "SVIZ_ACQUISTI", "BSP_ACQUISTI", "MALT_ACQUISTI", "MONT_ACQUISTI",
+    "XGRE_ACQUISTI", "XAUS_ACQUISTI", "XFRA_ACQUISTI",
+    "TOTALE_VENDITE", "NAT_VENDITE", "CALA_VENDITE", "CNOR_VENDITE",
+    "CSUD_VENDITE", "NORD_VENDITE", "SARD_VENDITE", "SICI_VENDITE",
+    "SUD_VENDITE", "AUST_VENDITE", "COAC_VENDITE", "COUP_VENDITE",
+    "CORS_VENDITE", "FRAN_VENDITE", "GREC_VENDITE", "SLOV_VENDITE",
+    "SVIZ_VENDITE", "BSP_VENDITE", "MALT_VENDITE", "MONT_VENDITE",
+    "XGRE_VENDITE", "XAUS_VENDITE", "XFRA_VENDITE"
+    )
+    } else {
+    quantita_elements <- c('DATE', 'MARKET', 'HOUR',
+        "TOTALE_ACQUISTI", "NAT_ACQUISTI", "CALA_ACQUISTI", "CNOR_ACQUISTI",
+        "CSUD_ACQUISTI", "NORD_ACQUISTI", "SARD_ACQUISTI", "SICI_ACQUISTI",
+        "SUD_ACQUISTI", "AUST_ACQUISTI", "COAC_ACQUISTI", "COUP_ACQUISTI",
+        "CORS_ACQUISTI", "FRAN_ACQUISTI", "GREC_ACQUISTI", "SLOV_ACQUISTI",
+        "SVIZ_ACQUISTI", "BSP_ACQUISTI", "MALT_ACQUISTI", 
+        "MONT_ACQUISTI", "XGRE_ACQUISTI", "TOTALE_VENDITE",
+        "NAT_VENDITE", "CALA_VENDITE", "CNOR_VENDITE", "CSUD_VENDITE",
+        "NORD_VENDITE", "SARD_VENDITE", "SICI_VENDITE", "SUD_VENDITE",
+        "AUST_VENDITE", "COAC_VENDITE", "COUP_VENDITE", "CORS_VENDITE",
+        "FRAN_VENDITE", "GREC_VENDITE", "SLOV_VENDITE", "SVIZ_VENDITE",
+        "BSP_VENDITE", "MALT_VENDITE",
+        "MONT_VENDITE", "XGRE_VENDITE"
+    )
+    }
+    setnames(data_dt, names(data_dt), quantita_elements)
 
-# Reshape the data to long format
-data_dt_long <- melt(data_dt, id.vars = c("DATE", "MARKET", "HOUR"),
-                        variable.name = "ZONE", value.name = "VALUE",
-                    variable.factor = FALSE)
+    # Reshape the data to long format
+    data_dt_long <- melt(data_dt, id.vars = c("DATE", "MARKET", "HOUR"),
+                            variable.name = "ZONE", value.name = "VALUE",
+                        variable.factor = FALSE)
 
-# Convert DATE and HOUR to proper formats
-data_dt_long[, DATE := as.Date(DATE, format = "%Y%m%d")]
-data_dt_long[, HOUR := as.integer(HOUR)]
-data_dt_long[, TIME := paste0(sprintf("%02d", as.numeric(HOUR)), ":00")]
-data_dt_long[, VALUE := as.numeric(VALUE)]
+    # Convert DATE and HOUR to proper formats
+    data_dt_long[, DATE := as.Date(DATE, format = "%Y%m%d")]
+    data_dt_long[, HOUR := as.integer(HOUR)]
+    data_dt_long[, TIME := paste0(sprintf("%02d", as.numeric(HOUR)), ":00")]
+    data_dt_long[, VALUE := as.numeric(VALUE)]
 
-# Add unit for the values
-data_dt_long[, UNIT := "MWh"]
+    # Add unit for the values
+    data_dt_long[, UNIT := "MWh"]
 
-data_dt_long = unique(data_dt_long)
+    data_dt_long = unique(data_dt_long)
 
-return(data_dt_long)
+    return(data_dt_long)
 }
 
 
