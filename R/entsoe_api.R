@@ -49,7 +49,12 @@
 #' }
 #'
 #' @export
-entsoe_dam_prices = function(country, from_data, to_data, api_key = Sys.getenv("ENTSOE_KEY")) {
+entsoe_dam_prices = function(
+  country,
+  from_data,
+  to_data,
+  api_key = Sys.getenv("ENTSOE_KEY")
+) {
   # Format timestamps
   start = from_data
   end = to_data
@@ -172,7 +177,12 @@ except Exception as e:
 #' }
 #'
 #' @export
-entsoe_actual_generation = function(country, from_data, to_data, api_key = Sys.getenv("ENTSOE_KEY")) {
+entsoe_actual_generation = function(
+  country,
+  from_data,
+  to_data,
+  api_key = Sys.getenv("ENTSOE_KEY")
+) {
   # Format timestamps
   start = from_data
   end = to_data
@@ -189,20 +199,26 @@ entsoe_actual_generation = function(country, from_data, to_data, api_key = Sys.g
 from entsoe import EntsoePandasClient
 import pandas as pd
 
+start = pd.Timestamp('%s', tz='Europe/Brussels')
+end = pd.Timestamp('%s', tz='Europe/Brussels')
+client = EntsoePandasClient(api_key='%s')
+df = client.query_generation('%s', start=start, end=end, psr_type=None)
+
 try:
-    start = pd.Timestamp('%s', tz='Europe/Brussels')
-    end = pd.Timestamp('%s', tz='Europe/Brussels')
-    client = EntsoePandasClient(api_key='%s')
-    df = client.query_generation('%s', start=start, end=end, psr_type=None)
     idx = pd.IndexSlice
     df = df.loc[:, idx[:, 'Actual Aggregated']]
     df.columns = df.columns.droplevel(1)
     df = df.reset_index()
     df = df.melt('index', var_name='generation_type', value_name='value')
     error_msg = ''
-except Exception as e:
-    df = None
-    error_msg = str(e)
+except KeyError as e:
+    if 'Actual Aggregated' in str(e):
+        df = df.reset_index()
+        df = df.melt('index', var_name='generation_type', value_name='value')
+        error_msg = ''
+    else:
+        df = None
+        error_msg = str(e)
 ",
     start,
     end,
