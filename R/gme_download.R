@@ -14,19 +14,24 @@
 #' print(file_dt)
 #' }
 #' @export
-gme_get_directory <- function(username = "PIASARACENO", password = "18N15C9R") {
-
-    url_base = paste0('ftp://download.mercatoelettrico.org/MercatiElettrici/')
-    ftp_list_cmd = paste0("curl -u ", username, ":", password, " ", url_base)
-    file_list = system(ftp_list_cmd, intern = TRUE)
-
-    file_dt = fread(
-        text = file_list,
-        fill = TRUE,
-        header = FALSE
+gme_get_directory = function(
+        username = "PIASARACENO",
+        password = "18N15C9R",
+        host = "download.ipex.it",
+        path = "MercatiElettrici/"
+) {
+    url = sprintf("ftps://%s/%s", host, path)  # implicit TLS (990)
+    args = c(
+        "-sS",            # silent progress, show errors
+        "--fail",         # non-2xx => error
+        "--ftp-pasv",
+        "--list-only",    # names only
+        "-u", sprintf("%s:%s", username, password),
+        url
     )
-
-    return(file_dt)
+    out = tryCatch(system2("curl", args, stdout = TRUE, stderr = TRUE),
+                   error = function(e) stop(conditionMessage(e)))
+    data.table(name = out[nchar(out) > 0])
 }
 
 
@@ -52,52 +57,79 @@ gme_get_directory <- function(username = "PIASARACENO", password = "18N15C9R") {
 #' files <- gme_mgp_get_files(data_type = "MGP_Prezzi", verbose = TRUE)
 #' }
 #' @export
-gme_mgp_get_files <- function(data_type, output_dir = "data",
-                              username = "PIASARACENO", password = "18N15C9R",
-                              verbose = FALSE) {
+gme_mgp_get_files = function(data_type,
+                             output_dir = "data",
+                             username = "PIASARACENO",
+                             password = "18N15C9R",
+                             host = "download.ipex.it",
+                             verbose = FALSE) {
 
     allowed_data_types = c("MGP_Prezzi", "MGP_Quantita", "MGP_Fabbisogno",
                            "MGP_Liquidita", "MGP_Transiti", "MGP_LimitiTransito")
 
-    # Validate data_type
     if (!data_type %in% allowed_data_types) {
         stop(paste("Invalid data_type:", data_type,
                    ". Must be one of:", paste(allowed_data_types, collapse = ", ")))
     }
 
-    url_base = paste0('ftp://download.mercatoelettrico.org/MercatiElettrici/', data_type, '/')
+    patterns = list(
+        MGP_Prezzi = "\\S+MGPPrezzi\\.xml$",
+        MGP_Quantita = "\\S+MGPQuantita\\.xml$",
+        MGP_Fabbisogno = "\\S+MGPFabbisogno\\.xml$",
+        MGP_Liquidita = "\\S+MGPLiquidita\\.xml$",
+        MGP_Transiti = "\\S+MGPTransiti\\.xml$",
+        MGP_LimitiTransito = "\\S+MGPLimitiTransito\\.xml$"
+    )
+    file_pattern = patterns[[data_type]]
 
-    if (data_type == "MGP_Prezzi") {file_pattern = "\\S+MGPPrezzi\\.xml$"}
-    if (data_type == "MGP_Quantita") {file_pattern = "\\S+MGPQuantita\\.xml$"}
-    if (data_type == "MGP_Fabbisogno") {file_pattern = "\\S+MGPFabbisogno\\.xml$"}
-    if (data_type == "MGP_Liquidita") {file_pattern = "\\S+MGPLiquidita\\.xml$"}
-    if (data_type == "MGP_Transiti") {file_pattern = "\\S+MGPTransiti\\.xml$"}
-    if (data_type == "MGP_LimitiTransito") {file_pattern = "\\S+MGPLimitiTransito\\.xml$"}
+    if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
 
-    # Ensure output directory exists
-    if (!dir.exists(output_dir)) {
-        dir.create(output_dir, recursive = TRUE)
+    path = sprintf("MercatiElettrici/%s/", data_type)
+
+    # 1) Try implicit FTPS (port 990)
+    url_ftps = sprintf("ftps://%s/%s", host, path)
+    args1 = c(
+        "-sS", "--fail", "--ftp-pasv", "--list-only",
+        "-u", sprintf("%s:%s", username, password),
+        url_ftps
+    )
+    out = tryCatch(system2("curl", args1, stdout = TRUE, stderr = TRUE),
+                   error = function(e) structure(conditionMessage(e), class = "curl_err"))
+
+    # 2) Fallback: explicit TLS on port 21 (some networks prefer this)
+    if (inherits(out, "curl_err") || length(out) == 0) {
+        url_ftp = sprintf("ftp://%s/%s", host, path)
+        args2 = c(
+            "-sS", "--fail", "--ftp-pasv", "--list-only", "--ssl",
+            "-u", sprintf("%s:%s", username, password),
+            url_ftp
+        )
+        out = tryCatch(system2("curl", args2, stdout = TRUE, stderr = TRUE),
+                       error = function(e) structure(conditionMessage(e), class = "curl_err"))
     }
 
-    # List files on the FTP server
-    tryCatch({
-        ftp_list_cmd <- paste0("curl -u ", username, ":", password, " ", url_base)
-        file_list <- system(ftp_list_cmd, intern = TRUE)
-        matches <- regexpr(file_pattern, file_list)
-        files <- regmatches(file_list, matches)
-        files <- files[nzchar(files)]
+    if (inherits(out, "curl_err") || length(out) == 0) {
+        stop(paste0("Directory listing failed for ", data_type, ". Curl said:\n", paste(out, collapse = "\n")))
+    }
 
-        # Print available files
-        if(isTRUE(verbose)) {
+    # Filter names by the requested pattern
+    files = out[nchar(out) > 0]
+    files = files[grepl(file_pattern, files)]
+
+    if (isTRUE(verbose)) {
+        if (requireNamespace("crayon", quietly = TRUE)) {
             message(crayon::green("Available files:"))
-            print(files)
+        } else {
+            message("Available files:")
         }
-        message(crayon::green("[OK] Available files download."))
-        return(files)
-    }, error = function(e) {
-        message(crayon::red("[ERROR] Error downloading filenames from GME directory", e$message))
-        return(NULL)
-    })
+        print(files)
+        if (requireNamespace("crayon", quietly = TRUE)) {
+            message(crayon::green("[OK] Available files listed."))
+        } else {
+            message("[OK] Available files listed.")
+        }
+    }
+
     return(files)
 }
 
@@ -131,98 +163,140 @@ gme_mgp_get_files <- function(data_type, output_dir = "data",
 #' @import data.table
 #' @importFrom xml2 read_xml xml_find_all xml_text
 #' @export
-mgp_download_file <- function(filename, data_type = 'MGP_Prezzi', output_dir, username, password, raw = FALSE) {
+mgp_download_file = function(filename,
+                             data_type = "MGP_Prezzi",
+                             output_dir,
+                             username,
+                             password,
+                             raw = FALSE,
+                             host = "download.ipex.it",
+                             verbose = FALSE,
+                             tries = 2) {
 
-    allowed_data_types = c("MGP_Prezzi", "MGP_Quantita", "MGP_Fabbisogno",
-                           "MGP_Liquidita", "MGP_Transiti", "MGP_LimitiTransito")
-
-    # Validate data_type
+    allowed_data_types = c("MGP_Prezzi","MGP_Quantita","MGP_Fabbisogno",
+                           "MGP_Liquidita","MGP_Transiti","MGP_LimitiTransito")
     if (!data_type %in% allowed_data_types) {
         stop(paste("Invalid data_type:", data_type,
                    ". Must be one of:", paste(allowed_data_types, collapse = ", ")))
     }
 
-    # Validate filename
+    # Validate filename (your helper)
     validated_filename = gme_validate_filename(filename = filename, num_digits = 8, file_extension = "xml")
-    if(isTRUE(validated_filename)) {
+    if (!isTRUE(validated_filename)) {
+        if (requireNamespace("crayon", quietly = TRUE)) {
+            message(crayon::red("[ERROR] Wrong Filename"))
+        } else message("[ERROR] Wrong Filename")
+        return(NULL)
+    }
 
-    # Construct the file URL
+    if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
+    output_file = file.path(output_dir, filename)
 
-    url_base = paste0('ftp://download.mercatoelettrico.org/MercatiElettrici/', data_type, '/')
-    file_url <- paste0(url_base, filename)
+    # ---- helpers ------------------------------------------------------------
+    .msg_ok  = function(...) if (requireNamespace("crayon", quietly = TRUE)) message(crayon::green(...)) else message(...)
+    .msg_err = function(...) if (requireNamespace("crayon", quietly = TRUE)) message(crayon::red(...))   else message(...)
 
-    # Construct the output file path
-    output_file <- file.path(output_dir, filename)
+    path = sprintf("MercatiElettrici/%s/%s", data_type, filename)
 
-    # Create a curl handle
-    h <- curl::new_handle()
-    curl::handle_setopt(h,
-                        .list = list(
-                            userpwd = paste0(username, ":", password),
-                            ftp_use_epsv = TRUE))  # Use passive mode for FTP
+    # attempt 1: implicit FTPS (port 990 via scheme)
+    file_url_ftps = sprintf("ftps://%s/%s", host, path)
 
-    # Perform the download and process the XML file
-    result_df <- tryCatch({
-        curl::curl_download(file_url, output_file, handle = h)
+    h1 = curl::new_handle()
+    curl::handle_setopt(h1,
+                        userpwd = sprintf("%s:%s", username, password),
+                        ftp_use_epsv = TRUE,         # passive mode
+                        connecttimeout = 30L,
+                        low_speed_time = 30L,
+                        low_speed_limit = 1L,
+                        verbose = isTRUE(verbose)
+    )
 
-        # Check if the download was successful
-        message(crayon::green("File downloaded successfully: ", output_file))
+    # attempt 2: explicit TLS (FTP over port 21 with TLS negotiation)
+    file_url_ftp_explicit = sprintf("ftp://%s/%s", host, path)
+    h2 = curl::new_handle()
+    curl::handle_setopt(h2,
+                        userpwd = sprintf("%s:%s", username, password),
+                        ftp_use_epsv = TRUE,
+                        use_ssl = 3L,                # CURLOPT_USE_SSL = CURLUSESSL_ALL
+                        # Optional: prefer TLS for control/data
+                        # ftpsslauth = 1L,           # 1=TLS (if your libcurl supports it)
+                        connecttimeout = 30L,
+                        low_speed_time = 30L,
+                        low_speed_limit = 1L,
+                        verbose = isTRUE(verbose)
+    )
 
-        # Process the downloaded XML file
-        if (isFALSE(raw)) {
-            if (data_type == 'MGP_Prezzi') {
-                result_df <- gme_dam_price_xml_to_data(output_file)
-                setcolorder(result_df, c('DATE', 'TIME', 'HOUR', 'MARKET', 'ZONE', 'VALUE', 'UNIT'))
+    # download with fallback + simple retry loop
+    .try_download = function(url, handle) {
+        for (i in seq_len(tries)) {
+            ok = tryCatch({
+                curl::curl_download(url, output_file, handle = handle, mode = "wb")
+                TRUE
+            }, error = function(e) {
+                if (isTRUE(verbose)) .msg_err(sprintf("[ERROR] Try %d failed: %s", i, e$message))
+                FALSE
+            })
+            if (ok) return(TRUE)
+            Sys.sleep(1)
+        }
+        FALSE
+    }
+
+    downloaded = .try_download(file_url_ftps, h1)
+    if (!downloaded) {
+        if (isTRUE(verbose)) .msg_err("Implicit FTPS failed; trying explicit TLS on ftp:// ...")
+        downloaded = .try_download(file_url_ftp_explicit, h2)
+    }
+
+    if (!downloaded) {
+        .msg_err(sprintf("[ERROR] Download failed for %s (%s)", filename, data_type))
+        return(NULL)
+    }
+
+    .msg_ok("File downloaded successfully: ", output_file)
+
+    # ---- post-processing ----------------------------------------------------
+    result_df = NULL
+    if (isFALSE(raw)) {
+        result_df = tryCatch({
+            if (data_type == "MGP_Prezzi") {
+                df = gme_dam_price_xml_to_data(output_file)
+                setcolorder(df, c("DATE","TIME","HOUR","MARKET","ZONE","VALUE","UNIT"))
+            } else if (data_type == "MGP_Quantita") {
+                df = gme_dam_quantity_xml_to_data(output_file)
+                setcolorder(df, c("DATE","TIME","HOUR","MARKET","ZONE","VALUE","UNIT"))
+            } else if (data_type == "MGP_Fabbisogno") {
+                df = gme_dam_fabb_xml_to_data(output_file)
+                setcolorder(df, c("DATE","TIME","HOUR","MARKET","ZONE","VALUE","UNIT"))
+            } else if (data_type == "MGP_Liquidita") {
+                df = gme_dam_liq_xml_to_data(output_file)
+                setcolorder(df, c("DATE","TIME","HOUR","MARKET","ZONE","VALUE","UNIT"))
+            } else if (data_type == "MGP_Transiti") {
+                df = gme_dam_tran_xml_to_data(output_file)
+                setcolorder(df, c("DATE","TIME","HOUR","MARKET","ZONE","VALUE","UNIT"))
+            } else if (data_type == "MGP_LimitiTransito") {
+                df = gme_dam_limtran_xml_to_data(output_file)
+                setcolorder(df, c("DATE","TIME","HOUR","MARKET","ZONE","VARIABLE","VALUE","UNIT"))
             }
-            if (data_type == 'MGP_Quantita') {
-                result_df <- gme_dam_quantity_xml_to_data(output_file)
-                setcolorder(result_df, c('DATE', 'TIME', 'HOUR', 'MARKET', 'ZONE', 'VALUE', 'UNIT'))
-            }
-            if (data_type == 'MGP_Fabbisogno') {
-                result_df <- gme_dam_fabb_xml_to_data(output_file)
-                setcolorder(result_df, c('DATE', 'TIME', 'HOUR', 'MARKET', 'ZONE', 'VALUE', 'UNIT'))
-            }
-            if (data_type == 'MGP_Liquidita') {
-                result_df <- gme_dam_liq_xml_to_data(output_file)
-                setcolorder(result_df, c('DATE', 'TIME', 'HOUR', 'MARKET', 'ZONE', 'VALUE', 'UNIT'))
-            }
-            if (data_type == 'MGP_Transiti') {
-                result_df <- gme_dam_tran_xml_to_data(output_file)
-                setcolorder(result_df, c('DATE', 'TIME', 'HOUR', 'MARKET', 'ZONE', 'VALUE', 'UNIT'))
-            }
-            if (data_type == 'MGP_LimitiTransito') {
-                result_df <- gme_dam_limtran_xml_to_data(output_file)
-                setcolorder(result_df, c('DATE', 'TIME', 'HOUR', 'MARKET', 'ZONE', 'VARIABLE', 'VALUE', 'UNIT'))
-            }
-            # Optionally remove the downloaded file after processing
+            df
+        }, error = function(e) {
+            .msg_err("[ERROR] XML processing failed: ", e$message)
+            NULL
+        })
+
+        if (is.null(result_df)) {
+            .msg_err("[ERROR] An error occurred; result_df is NULL.")
         } else {
-            result_df <- FALSE
+            .msg_ok("[OK] Processing completed successfully.")
         }
 
-        result_df
-    }, error = function(e) {
-        # Handle errors (e.g., failed download or XML processing)
-        message(crayon::red("[ERROR] Error downloading file: ", filename, " - ", e$message))
-        result_df = NULL
-        result_df
-    })
-
-    if (is.null(result_df)) {
-        message(crayon::red("[ERROR] An error occurred; result_df is NULL."))
-    } else {
-        message(crayon::green("[OK] Processing completed successfully."))
-    }
-
-    if(isFALSE(raw)) {
-        file.remove(output_file)
+        # remove raw file after parsing
+        try(suppressWarnings(file.remove(output_file)), silent = TRUE)
         return(result_df)
-    } else {
-        message(paste(crayon::green("[OK] XML File at:", output_file)))
-        return(TRUE)
-    }
 
     } else {
-        message(crayon::red("[ERROR] Wrong Filename"))
+        .msg_ok("[OK] XML File at: ", output_file)
+        return(TRUE)
     }
 }
 
@@ -396,12 +470,12 @@ gme_dam_quantity_xml_to_data <- function(xml_file_path) {
         "AUST_VENDITE", "COAC_VENDITE", "COUP_VENDITE", "CORS_VENDITE",
         "FRAN_VENDITE", "GREC_VENDITE", "SLOV_VENDITE", "SVIZ_VENDITE",
         "BSP_VENDITE", "MALT_VENDITE", "XAUS_VENDITE", "XFRA_VENDITE",
-        "MONT_VENDITE", "XGRE_VENDITE", "TOTITABSP_VENDITE", "TOTITABSP_ACQUISTI"
+        "MONT_VENDITE", "XGRE_VENDITE", "TOTITABSP_VENDITE", "TOTITABSP_ACQUISTI", 'INTERVAL_NO'
     )
     setnames(data_dt, names(data_dt), quantita_elements)
 
     # Reshape the data to long format
-    data_dt_long <- melt(data_dt, id.vars = c("DATE", "MARKET", "HOUR"),
+    data_dt_long <- melt(data_dt, id.vars = c("DATE", "MARKET", "HOUR", "INTERVAL_NO"),
                          variable.name = "ZONE", value.name = "VALUE",
                         variable.factor = FALSE)
 
@@ -410,6 +484,7 @@ gme_dam_quantity_xml_to_data <- function(xml_file_path) {
     data_dt_long[, HOUR := as.integer(HOUR)]
     data_dt_long[, TIME := paste0(sprintf("%02d", as.numeric(HOUR)), ":00")]
     data_dt_long[, VALUE := as.numeric(VALUE)]
+    data_dt_long[, INTERVAL_NO := as.numeric(INTERVAL_NO)]
 
     # Add unit for the values
     data_dt_long[, UNIT := "MWh"]
@@ -764,13 +839,13 @@ gme_dam_limtran_xml_to_data <- function(xml_file_path) {
 
 #' Retrieve List of Available GME MI Market XML Files from FTP
 #'
-#' Connects to the GME FTP server and lists available XML files for MI-A1, MI-A2, or MI-A3 
+#' Connects to the GME FTP server and lists available XML files for MI-A1, MI-A2, or MI-A3
 #' market sessions (prices or quantities). Filters files by the appropriate naming pattern.
 #'
-#' @param data_type Character string specifying the type of data to retrieve. Must be one of: 
-#'   `"MI-A1_Prezzi"`, `"MI-A2_Prezzi"`, `"MI-A3_Prezzi"`, 
+#' @param data_type Character string specifying the type of data to retrieve. Must be one of:
+#'   `"MI-A1_Prezzi"`, `"MI-A2_Prezzi"`, `"MI-A3_Prezzi"`,
 #'   `"MI-A1_Quantita"`, `"MI-A2_Quantita"`, `"MI-A3_Quantita"`.
-#' @param output_dir Directory path to store the files (not used in this version, but directory is ensured to exist). 
+#' @param output_dir Directory path to store the files (not used in this version, but directory is ensured to exist).
 #'   Defaults to `"data"`.
 #' @param username FTP username. Default is `"PIASARACENO"`.
 #' @param password FTP password. Default is `"18N15C9R"`.
@@ -785,54 +860,81 @@ gme_dam_limtran_xml_to_data <- function(xml_file_path) {
 #' }
 #'
 #' @export
-gme_mi_get_files <- function(data_type, output_dir = "data",
-                              username = "PIASARACENO", password = "18N15C9R",
-                              verbose = FALSE) {
+library(data.table)
 
-    allowed_data_types = c('MI-A1_Prezzi', 'MI-A2_Prezzi', 'MI-A3_Prezzi', 
-                           'MI-A1_Quantita', 'MI-A2_Quantita', 'MI-A3_Quantita')
+gme_mi_get_files = function(data_type,
+                            output_dir = "data",
+                            username = "PIASARACENO",
+                            password = "18N15C9R",
+                            host = "download.ipex.it",
+                            verbose = FALSE) {
 
-    # Validate data_type
+    allowed_data_types = c("MI-A1_Prezzi","MI-A2_Prezzi","MI-A3_Prezzi",
+                           "MI-A1_Quantita","MI-A2_Quantita","MI-A3_Quantita")
+
     if (!data_type %in% allowed_data_types) {
         stop(paste("Invalid data_type:", data_type,
                    ". Must be one of:", paste(allowed_data_types, collapse = ", ")))
     }
 
-    url_base = paste0('ftp://download.mercatoelettrico.org/MercatiElettrici/', data_type, '/')
+    patterns = list(
+        `MI-A1_Prezzi`    = "\\S+MI-A1Prezzi\\.xml$",
+        `MI-A2_Prezzi`    = "\\S+MI-A2Prezzi\\.xml$",
+        `MI-A3_Prezzi`    = "\\S+MI-A3Prezzi\\.xml$",
+        `MI-A1_Quantita`  = "\\S+MI-A1Quantita\\.xml$",
+        `MI-A2_Quantita`  = "\\S+MI-A2Quantita\\.xml$",
+        `MI-A3_Quantita`  = "\\S+MI-A3Quantita\\.xml$"
+    )
+    file_pattern = patterns[[data_type]]
 
-    if (data_type == "MI-A1_Prezzi") {file_pattern = "\\S+MI-A1Prezzi\\.xml$"}
-    if (data_type == "MI-A2_Prezzi") {file_pattern = "\\S+MI-A2Prezzi\\.xml$"}
-    if (data_type == "MI-A3_Prezzi") {file_pattern = "\\S+MI-A3Prezzi\\.xml$"}
-    if (data_type == "MI-A1_Quantita") {file_pattern = "\\S+MI-A1Quantita\\.xml$"}
-    if (data_type == "MI-A2_Quantita") {file_pattern = "\\S+MI-A2Quantita\\.xml$"}
-    if (data_type == "MI-A3_Quantita") {file_pattern = "\\S+MI-A3Quantita\\.xml$"}
+    if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
 
-    # Ensure output directory exists
-    if (!dir.exists(output_dir)) {
-        dir.create(output_dir, recursive = TRUE)
+    path = sprintf("MercatiElettrici/%s/", data_type)
+
+    # 1) implicit FTPS (port 990)
+    url_ftps = sprintf("ftps://%s/%s", host, path)
+    args1 = c(
+        "-sS", "--fail", "--ftp-pasv", "--list-only",
+        "-u", sprintf("%s:%s", username, password),
+        url_ftps
+    )
+    out = tryCatch(system2("curl", args1, stdout = TRUE, stderr = TRUE),
+                   error = function(e) structure(conditionMessage(e), class = "curl_err"))
+
+    # 2) fallback: explicit TLS over FTP (port 21)
+    if (inherits(out, "curl_err") || length(out) == 0) {
+        url_ftp = sprintf("ftp://%s/%s", host, path)
+        args2 = c(
+            "-sS", "--fail", "--ftp-pasv", "--list-only", "--ssl",
+            "-u", sprintf("%s:%s", username, password),
+            url_ftp
+        )
+        out = tryCatch(system2("curl", args2, stdout = TRUE, stderr = TRUE),
+                       error = function(e) structure(conditionMessage(e), class = "curl_err"))
     }
 
-    # List files on the FTP server
-    tryCatch({
-        ftp_list_cmd <- paste0("curl -u ", username, ":", password, " ", url_base)
-        file_list <- system(ftp_list_cmd, intern = TRUE)
-        matches <- regexpr(file_pattern, file_list)
-        files <- regmatches(file_list, matches)
-        files <- files[nzchar(files)]
+    if (inherits(out, "curl_err") || length(out) == 0) {
+        stop(paste0("Directory listing failed for ", data_type, ". Curl said:\n", paste(out, collapse = "\n")))
+    }
 
-        # Print available files
-        if(isTRUE(verbose)) {
+    files = out[nchar(out) > 0]
+    files = files[grepl(file_pattern, files)]
+
+    if (isTRUE(verbose)) {
+        if (requireNamespace("crayon", quietly = TRUE)) {
             message(crayon::green("Available files:"))
             print(files)
+            message(crayon::green("[OK] Available files listed."))
+        } else {
+            message("Available files:")
+            print(files)
+            message("[OK] Available files listed.")
         }
-        message(crayon::green("[OK] Available files download."))
-        return(files)
-    }, error = function(e) {
-        message(crayon::red("[ERROR] Error downloading filenames from GME directory", e$message))
-        return(NULL)
-    })
+    }
+
     return(files)
 }
+
 
 
 #' Download and Parse GME MI Market XML File
@@ -841,7 +943,7 @@ gme_mi_get_files <- function(data_type, output_dir = "data",
 #' validates the filename and data type, and optionally parses the file into a `data.table`.
 #'
 #' @param filename Character. Filename of the XML to download (must be 8-digit date + `.xml`, e.g. `"20240710.xml"`).
-#' @param data_type Character. Type of data to download. One of: `"MI-A1_Prezzi"`, `"MI-A2_Prezzi"`, `"MI-A3_Prezzi"`, 
+#' @param data_type Character. Type of data to download. One of: `"MI-A1_Prezzi"`, `"MI-A2_Prezzi"`, `"MI-A3_Prezzi"`,
 #' `"MI-A1_Quantita"`, `"MI-A2_Quantita"`, `"MI-A3_Quantita"`.
 #' @param output_dir Character. Local directory to store the downloaded XML file temporarily.
 #' @param username Character. Username for GME FTP access.
@@ -866,101 +968,126 @@ gme_mi_get_files <- function(data_type, output_dir = "data",
 #' The function checks for valid file name format and supported `data_type`. After downloading,
 #' it calls the appropriate parser: `gme_mi_price_xml_to_data()` or `gme_mi_qty_x
 #' @export
-mi_download_file <- function(filename, data_type = 'MI-A1_Prezzi', output_dir, username, password, raw = FALSE) {
+mi_download_file = function(filename,
+                            data_type = "MI-A1_Prezzi",
+                            output_dir,
+                            username,
+                            password,
+                            raw = FALSE,
+                            host = "download.ipex.it",
+                            verbose = FALSE,
+                            tries = 2) {
 
-    allowed_data_types = c('MI-A1_Prezzi', 'MI-A2_Prezzi', 'MI-A3_Prezzi', 
-                           'MI-A1_Quantita', 'MI-A2_Quantita', 'MI-A3_Quantita')
-  
-    # Validate data_type
+    allowed_data_types = c("MI-A1_Prezzi","MI-A2_Prezzi","MI-A3_Prezzi",
+                           "MI-A1_Quantita","MI-A2_Quantita","MI-A3_Quantita")
     if (!data_type %in% allowed_data_types) {
         stop(paste("Invalid data_type:", data_type,
                    ". Must be one of:", paste(allowed_data_types, collapse = ", ")))
     }
-  
+
     # Validate filename
     validated_filename = gme_validate_filename(filename = filename, num_digits = 8, file_extension = "xml")
-    if(isTRUE(validated_filename)) {
-  
-    # Construct the file URL
-  
-    url_base = paste0('ftp://download.mercatoelettrico.org/MercatiElettrici/', data_type, '/')
-    file_url <- paste0(url_base, filename)
-  
-    # Construct the output file path
-    output_file <- file.path(output_dir, filename)
-  
-    # Create a curl handle
-    h <- curl::new_handle()
-    curl::handle_setopt(h,
-                        .list = list(
-                            userpwd = paste0(username, ":", password),
-                            ftp_use_epsv = TRUE))  # Use passive mode for FTP
-  
-    # Perform the download and process the XML file
-    result_df <- tryCatch({
-        curl::curl_download(file_url, output_file, handle = h)
-  
-        # Check if the download was successful
-        message(crayon::green("File downloaded successfully: ", output_file))
-  
-        # Process the downloaded XML file
-        if (isFALSE(raw)) {
-            if (data_type == 'MI-A1_Prezzi') {
-                result_df <- gme_mi_price_xml_to_data(output_file)
-                setcolorder(result_df, c('DATE', 'TIME', 'HOUR', 'MARKET', 'ZONE', 'VALUE', 'UNIT'))
-            }
-            if (data_type == 'MI-A2_Prezzi') {
-                result_df <- gme_mi_price_xml_to_data(output_file)
-                setcolorder(result_df, c('DATE', 'TIME', 'HOUR', 'MARKET', 'ZONE', 'VALUE', 'UNIT'))
-            }
-            if (data_type == 'MI-A3_Prezzi') {
-                result_df <- gme_mi_price_xml_to_data(output_file)
-                setcolorder(result_df, c('DATE', 'TIME', 'HOUR', 'MARKET', 'ZONE', 'VALUE', 'UNIT'))
-            }
-            if (data_type == 'MI-A1_Quantita') {
-                result_df <- gme_mi_qty_xml_to_data(output_file)
-                setcolorder(result_df, c('DATE', 'TIME', 'HOUR', 'MARKET', 'ZONE', 'VALUE', 'UNIT'))
-            }
-            if (data_type == 'MI-A2_Quantita') {
-                result_df <- gme_mi_qty_xml_to_data(output_file)
-                setcolorder(result_df, c('DATE', 'TIME', 'HOUR', 'MARKET', 'ZONE', 'VALUE', 'UNIT'))
-            }
-            if (data_type == 'MI-A3_Quantita') {
-                result_df <- gme_mi_qty_xml_to_data(output_file)
-                setcolorder(result_df, c('DATE', 'TIME', 'HOUR', 'MARKET', 'ZONE', 'VALUE', 'UNIT'))
-            }
-            # Optionally remove the downloaded file after processing
-        } else {
-            result_df <- FALSE
-        }
-  
-        result_df
-    }, error = function(e) {
-        # Handle errors (e.g., failed download or XML processing)
-        message(crayon::red("[ERROR] Error downloading file: ", filename, " - ", e$message))
-        result_df = NULL
-        result_df
-    })
-  
-    if (is.null(result_df)) {
-        message(crayon::red("[ERROR] An error occurred; result_df is NULL."))
-    } else {
-        message(crayon::green("[OK] Processing completed successfully."))
+    if (!isTRUE(validated_filename)) {
+        if (requireNamespace("crayon", quietly = TRUE)) {
+            message(crayon::red("[ERROR] Wrong Filename"))
+        } else message("[ERROR] Wrong Filename")
+        return(NULL)
     }
-  
-    if(isFALSE(raw)) {
-        file.remove(output_file)
+
+    if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
+    output_file = file.path(output_dir, filename)
+
+    .msg_ok  = function(...) if (requireNamespace("crayon", quietly = TRUE)) message(crayon::green(...)) else message(...)
+    .msg_err = function(...) if (requireNamespace("crayon", quietly = TRUE)) message(crayon::red(...))   else message(...)
+
+    path = sprintf("MercatiElettrici/%s/%s", data_type, filename)
+
+    # Attempt 1: implicit FTPS (port 990 via scheme)
+    file_url_ftps = sprintf("ftps://%s/%s", host, path)
+    h1 = curl::new_handle()
+    curl::handle_setopt(h1,
+                        userpwd = sprintf("%s:%s", username, password),
+                        ftp_use_epsv = TRUE,
+                        connecttimeout = 30L,
+                        low_speed_time = 30L,
+                        low_speed_limit = 1L,
+                        verbose = isTRUE(verbose)
+    )
+
+    # Attempt 2: explicit TLS (FTP:21 + TLS)
+    file_url_ftp_explicit = sprintf("ftp://%s/%s", host, path)
+    h2 = curl::new_handle()
+    curl::handle_setopt(h2,
+                        userpwd = sprintf("%s:%s", username, password),
+                        ftp_use_epsv = TRUE,
+                        use_ssl = 3L, # CURLUSESSL_ALL
+                        connecttimeout = 30L,
+                        low_speed_time = 30L,
+                        low_speed_limit = 1L,
+                        verbose = isTRUE(verbose)
+    )
+
+    .try_download = function(url, handle) {
+        for (i in seq_len(tries)) {
+            ok = tryCatch({
+                curl::curl_download(url, output_file, handle = handle, mode = "wb")
+                TRUE
+            }, error = function(e) {
+                if (isTRUE(verbose)) .msg_err(sprintf("[ERROR] Try %d failed: %s", i, e$message))
+                FALSE
+            })
+            if (ok) return(TRUE)
+            Sys.sleep(1)
+        }
+        FALSE
+    }
+
+    downloaded = .try_download(file_url_ftps, h1)
+    if (!downloaded) {
+        if (isTRUE(verbose)) .msg_err("Implicit FTPS failed; trying explicit TLS on ftp:// ...")
+        downloaded = .try_download(file_url_ftp_explicit, h2)
+    }
+    if (!downloaded) {
+        .msg_err(sprintf("[ERROR] Download failed for %s (%s)", filename, data_type))
+        return(NULL)
+    }
+
+    .msg_ok("File downloaded successfully: ", output_file)
+
+    # Post-processing
+    result_df = NULL
+    if (isFALSE(raw)) {
+        result_df = tryCatch({
+            if (data_type %in% c("MI-A1_Prezzi","MI-A2_Prezzi","MI-A3_Prezzi")) {
+                df = gme_mi_price_xml_to_data(output_file)
+                setcolorder(df, c("DATE","TIME","HOUR","MARKET","ZONE","VALUE","UNIT"))
+            } else {
+                df = gme_mi_qty_xml_to_data(output_file)
+                setcolorder(df, c("DATE","TIME","HOUR","MARKET","ZONE","VALUE","UNIT"))
+            }
+            df
+        }, error = function(e) {
+            .msg_err("[ERROR] XML processing failed: ", e$message)
+            NULL
+        })
+
+        if (is.null(result_df)) {
+            .msg_err("[ERROR] An error occurred; result_df is NULL.")
+        } else {
+            .msg_ok("[OK] Processing completed successfully.")
+        }
+
+        # Remove the raw file after parsing
+        try(suppressWarnings(file.remove(output_file)), silent = TRUE)
         return(result_df)
+
     } else {
-        message(paste(crayon::green("[OK] XML File at:", output_file)))
+        .msg_ok("[OK] XML File at: ", output_file)
         return(TRUE)
     }
-  
-    } else {
-        message(crayon::red("[ERROR] Wrong Filename"))
-    }
-  }
-  
+}
+
+
 
 #' Download and Parse GME MI Market XML File
 #'
@@ -968,7 +1095,7 @@ mi_download_file <- function(filename, data_type = 'MI-A1_Prezzi', output_dir, u
 #' validates the filename and data type, and optionally parses the file into a `data.table`.
 #'
 #' @param filename Character. Filename of the XML to download (must be 8-digit date + `.xml`, e.g. `"20240710.xml"`).
-#' @param data_type Character. Type of data to download. One of: `"MI-A1_Prezzi"`, `"MI-A2_Prezzi"`, `"MI-A3_Prezzi"`, 
+#' @param data_type Character. Type of data to download. One of: `"MI-A1_Prezzi"`, `"MI-A2_Prezzi"`, `"MI-A3_Prezzi"`,
 #' `"MI-A1_Quantita"`, `"MI-A2_Quantita"`, `"MI-A3_Quantita"`.
 #' @param output_dir Character. Local directory to store the downloaded XML file temporarily.
 #' @param username Character. Username for GME FTP access.
@@ -1011,9 +1138,9 @@ mi_download_file <- function(filename, data_type = 'MI-A1_Prezzi', output_dir, u
 gme_mi_price_xml_to_data <- function(xml_file_path) {
 
     xml_data <- read_xml(xml_file_path)
-  
+
     prezzi_nodes <- xml_find_all(xml_data, ".//Prezzi")
-  
+
     # Extract the data from each 'Prezzi' element
     data_list <- lapply(prezzi_nodes, function(node) {
         data <- xml_text(xml_find_first(node, ".//Data"))
@@ -1042,7 +1169,7 @@ gme_mi_price_xml_to_data <- function(xml_file_path) {
         xfra <- xml_text(xml_find_first(node, ".//XFRA"))
         mont <- xml_text(xml_find_first(node, ".//MONT"))
         xgre <- xml_text(xml_find_first(node, ".//XGRE"))
-  
+
         # Return the extracted data as a named list
         list(
             Data = data, Mercato = mercato, Ora = ora, PUN = pun, NAT = nat, CALA = cala,
@@ -1052,27 +1179,27 @@ gme_mi_price_xml_to_data <- function(xml_file_path) {
             MONT = mont, XGRE = xgre
         )
     })
-  
+
     # Convert the list into a data frame
     data_df <- do.call(rbind, lapply(data_list, as.data.table))
-  
+
     data_df[, Data := as.Date(Data, format = "%Y%m%d")]
     data_df[, TIME := paste0(sprintf("%02d", as.numeric(Ora)), ":00")]
     setnames(data_df, c('Data', 'Mercato', 'Ora'), c('DATE', 'MARKET', 'HOUR'))
     data_df_lg <- melt(data_df, id.vars = c('DATE', 'TIME', 'HOUR', 'MARKET'), variable.factor = FALSE, variable.name = 'ZONE', value.name = 'VALUE')
     data_df_lg[, VALUE := as.numeric(gsub(",", ".", VALUE))]
     data_df_lg[, UNIT := 'EUR']
-  
+
     data_df_lg = unique(data_df_lg)
-  
+
     return(data_df_lg)
   }
 
 
 #' Parse GME MI Quantità XML File to Long-Format Data Table
 #'
-#' Reads and parses a GME MI-A XML file containing traded quantities by market session 
-#' and geographical zones. The function extracts data from `<Quantita>` nodes and returns 
+#' Reads and parses a GME MI-A XML file containing traded quantities by market session
+#' and geographical zones. The function extracts data from `<Quantita>` nodes and returns
 #' a clean, long-format `data.table` with standardized zone identifiers and hourly values.
 #'
 #' @param xml_file_path Character string. Full path to the XML file containing MI-A market quantities.
@@ -1089,7 +1216,7 @@ gme_mi_price_xml_to_data <- function(xml_file_path) {
 #' }
 #'
 #' @details
-#' This function handles both domestic and international zones for *acquisti* (purchases) 
+#' This function handles both domestic and international zones for *acquisti* (purchases)
 #' and *vendite* (sales). Missing or unexpected fields are handled gracefully by `rbindlist(fill=TRUE)`.
 #' The decimal separator is normalized (`,` to `.`) before conversion to numeric.
 #'
@@ -1150,7 +1277,7 @@ gme_mi_qty_xml_to_data <- function(xml_file_path) {
         "CSUD_ACQUISTI", "NORD_ACQUISTI", "SARD_ACQUISTI", "SICI_ACQUISTI",
         "SUD_ACQUISTI", "AUST_ACQUISTI", "COAC_ACQUISTI", "COUP_ACQUISTI",
         "CORS_ACQUISTI", "FRAN_ACQUISTI", "GREC_ACQUISTI", "SLOV_ACQUISTI",
-        "SVIZ_ACQUISTI", "BSP_ACQUISTI", "MALT_ACQUISTI", 
+        "SVIZ_ACQUISTI", "BSP_ACQUISTI", "MALT_ACQUISTI",
         "MONT_ACQUISTI", "XGRE_ACQUISTI", "TOTALE_VENDITE",
         "NAT_VENDITE", "CALA_VENDITE", "CNOR_VENDITE", "CSUD_VENDITE",
         "NORD_VENDITE", "SARD_VENDITE", "SICI_VENDITE", "SUD_VENDITE",
@@ -1210,52 +1337,76 @@ gme_mi_qty_xml_to_data <- function(xml_file_path) {
 #' files <- gme_rest_get_files(data_type = "MGP_Prezzi", verbose = TRUE)
 #' }
 #' @export
-gme_rest_get_files <- function(data_type, output_dir = "data",
-                              username = "PIASARACENO", password = "18N15C9R",
+library(data.table)
+
+gme_rest_get_files = function(data_type,
+                              output_dir = "data",
+                              username = "PIASARACENO",
+                              password = "18N15C9R",
+                              host = "download.ipex.it",
                               verbose = FALSE) {
 
-    # Define allowed data types
-    allowed_data_types = c("MSD_ServiziDispacciamento", "MB_PRiservaSecondaria",
-                           "MB_PAltriServizi", "MB_PTotali", "XBID_EsitiTotali")
+    allowed_data_types = c("MSD_ServiziDispacciamento",
+                           "MB_PRiservaSecondaria",
+                           "MB_PAltriServizi",
+                           "MB_PTotali",
+                           "XBID_EsitiTotali")
 
-    # Validate data_type
     if (!data_type %in% allowed_data_types) {
         stop(paste("Invalid data_type:", data_type,
                    ". Must be one of:", paste(allowed_data_types, collapse = ", ")))
     }
 
-    url_base = paste0('ftp://download.mercatoelettrico.org/MercatiElettrici/', data_type, '/')
+    patterns = list(
+        MSD_ServiziDispacciamento = "\\S+MSDServiziDispacciamento\\.xml$",
+        MB_PRiservaSecondaria      = "\\S+MBPRiservaSecondaria\\.xml$",
+        MB_PAltriServizi           = "\\S+MBPAltriServizi\\.xml$",
+        MB_PTotali                 = "\\S+MBPTotali\\.xml$",
+        XBID_EsitiTotali           = "\\S+XBIDEsitiTotali\\.xml$"
+    )
+    file_pattern = patterns[[data_type]]
 
-    if (data_type == "MSD_ServiziDispacciamento") {file_pattern = "\\S+MSDServiziDispacciamento\\.xml$"}
-    if (data_type == "MB_PRiservaSecondaria") {file_pattern = "\\S+MBPRiservaSecondaria\\.xml$"}
-    if (data_type == "MB_PAltriServizi") {file_pattern = "\\S+MBPAltriServizi\\.xml$"}
-    if (data_type == "MB_PTotali") {file_pattern = "\\S+MBPTotali\\.xml$"}
-    if (data_type == "XBID_EsitiTotali") {file_pattern = "\\S+XBIDEsitiTotali\\.xml$"}
+    if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
 
-    # Ensure output directory exists
-    if (!dir.exists(output_dir)) {
-        dir.create(output_dir, recursive = TRUE)
+    path = sprintf("MercatiElettrici/%s/", data_type)
+
+    # 1) implicit FTPS (port 990)
+    url_ftps = sprintf("ftps://%s/%s", host, path)
+    args1 = c("-sS","--fail","--ftp-pasv","--list-only",
+              "-u", sprintf("%s:%s", username, password),
+              url_ftps)
+    out = tryCatch(system2("curl", args1, stdout = TRUE, stderr = TRUE),
+                   error = function(e) structure(conditionMessage(e), class = "curl_err"))
+
+    # 2) fallback: explicit TLS on FTP:21
+    if (inherits(out, "curl_err") || length(out) == 0) {
+        url_ftp = sprintf("ftp://%s/%s", host, path)
+        args2 = c("-sS","--fail","--ftp-pasv","--list-only","--ssl",
+                  "-u", sprintf("%s:%s", username, password),
+                  url_ftp)
+        out = tryCatch(system2("curl", args2, stdout = TRUE, stderr = TRUE),
+                       error = function(e) structure(conditionMessage(e), class = "curl_err"))
     }
 
-    # List files on the FTP server
-    tryCatch({
-        ftp_list_cmd <- paste0("curl -u ", username, ":", password, " ", url_base)
-        file_list <- system(ftp_list_cmd, intern = TRUE)
-        matches <- regexpr(file_pattern, file_list)
-        files <- regmatches(file_list, matches)
-        files <- files[nzchar(files)]
+    if (inherits(out, "curl_err") || length(out) == 0) {
+        stop(paste0("Directory listing failed for ", data_type, ". Curl said:\n", paste(out, collapse = "\n")))
+    }
 
-        # Print available files
-        if(isTRUE(verbose)) {
+    files = out[nchar(out) > 0]
+    files = files[grepl(file_pattern, files)]
+
+    if (isTRUE(verbose)) {
+        if (requireNamespace("crayon", quietly = TRUE)) {
             message(crayon::green("[OK] Available files:"))
             print(files)
+            message(crayon::green("[OK] Available files listed."))
+        } else {
+            message("[OK] Available files:")
+            print(files)
+            message("[OK] Available files listed.")
         }
-        message(crayon::green("[OK] Available files download."))
-        return(files)
-    }, error = function(e) {
-        message(crayon::red("[ERROR] Error downloading filenames from GME directory", e$message))
-        return(NULL)
-    })
+    }
+
     return(files)
 }
 
@@ -1289,98 +1440,139 @@ gme_rest_get_files <- function(data_type, output_dir = "data",
 #' @import data.table
 #' @importFrom xml2 read_xml xml_find_all xml_text
 #' @export
-gme_other_download_file <- function(filename, data_type = 'MSD_ServiziDispacciamento', output_dir, username, password, raw = FALSE) {
-    # Construct the file URL
+gme_other_download_file = function(filename,
+                                   data_type = "MSD_ServiziDispacciamento",
+                                   output_dir,
+                                   username,
+                                   password,
+                                   raw = FALSE,
+                                   host = "download.ipex.it",
+                                   verbose = FALSE,
+                                   tries = 2) {
 
-    # Define allowed data types
-    allowed_data_types = c("MSD_ServiziDispacciamento", "MB_PRiservaSecondaria",
-                           "MB_PAltriServizi", "MB_PTotali", "XBID_EsitiTotali")
-
-    # Validate data_type
+    allowed_data_types = c("MSD_ServiziDispacciamento",
+                           "MB_PRiservaSecondaria",
+                           "MB_PAltriServizi",
+                           "MB_PTotali",
+                           "XBID_EsitiTotali")
     if (!data_type %in% allowed_data_types) {
         stop(paste("Invalid data_type:", data_type,
                    ". Must be one of:", paste(allowed_data_types, collapse = ", ")))
     }
 
-    # Validate filename
     validated_filename = gme_validate_filename(filename = filename, num_digits = 8, file_extension = "xml")
-    if(isTRUE(validated_filename)) {
+    if (!isTRUE(validated_filename)) {
+        if (requireNamespace("crayon", quietly = TRUE)) message(crayon::red("[ERROR] Wrong Filename")) else message("[ERROR] Wrong Filename")
+        return(NULL)
+    }
 
-    url_base = paste0('ftp://download.mercatoelettrico.org/MercatiElettrici/', data_type, '/')
-    file_url <- paste0(url_base, filename)
+    if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
+    output_file = file.path(output_dir, filename)
 
-    # Construct the output file path
-    output_file <- file.path(output_dir, filename)
+    .msg_ok  = function(...) if (requireNamespace("crayon", quietly = TRUE)) message(crayon::green(...)) else message(...)
+    .msg_err = function(...) if (requireNamespace("crayon", quietly = TRUE)) message(crayon::red(...))   else message(...)
 
-    # Create a curl handle
-    h <- curl::new_handle()
-    curl::handle_setopt(h,
-                        .list = list(
-                            userpwd = paste0(username, ":", password),
-                            ftp_use_epsv = TRUE))  # Use passive mode for FTP
+    path = sprintf("MercatiElettrici/%s/%s", data_type, filename)
 
-    # Perform the download and process the XML file
-    result_df <- tryCatch({
-        curl::curl_download(file_url, output_file, handle = h)
+    # Attempt 1: implicit FTPS (port 990)
+    file_url_ftps = sprintf("ftps://%s/%s", host, path)
+    h1 = curl::new_handle()
+    curl::handle_setopt(h1,
+                        userpwd = sprintf("%s:%s", username, password),
+                        ftp_use_epsv = TRUE,
+                        connecttimeout = 30L,
+                        low_speed_time = 30L,
+                        low_speed_limit = 1L,
+                        verbose = isTRUE(verbose)
+    )
 
-        # Check if the download was successful
-        message(crayon::green("File downloaded successfully: ", output_file))
+    # Attempt 2: explicit TLS over FTP:21
+    file_url_ftp_explicit = sprintf("ftp://%s/%s", host, path)
+    h2 = curl::new_handle()
+    curl::handle_setopt(h2,
+                        userpwd = sprintf("%s:%s", username, password),
+                        ftp_use_epsv = TRUE,
+                        use_ssl = 3L,  # CURLUSESSL_ALL
+                        connecttimeout = 30L,
+                        low_speed_time = 30L,
+                        low_speed_limit = 1L,
+                        verbose = isTRUE(verbose)
+    )
 
+    .try_download = function(url, handle) {
+        for (i in seq_len(tries)) {
+            ok = tryCatch({
+                curl::curl_download(url, output_file, handle = handle, mode = "wb")
+                TRUE
+            }, error = function(e) {
+                if (isTRUE(verbose)) .msg_err(sprintf("[ERROR] Try %d failed: %s", i, e$message))
+                FALSE
+            })
+            if (ok) return(TRUE)
+            Sys.sleep(1)
+        }
+        FALSE
+    }
 
-        # Process the downloaded XML file
-        if (isFALSE(raw)) {
-            if (data_type == 'MSD_ServiziDispacciamento') {
-                result_df <- gme_msd_all_xml_to_data(output_file)
-                setcolorder(result_df, c('DATE', 'TIME', 'HOUR', 'MARKET', 'ZONE', 'VARIABLE', 'VALUE', 'UNIT'))
-            }
-            if (data_type == 'MB_PRiservaSecondaria') {
-                result_df <- gme_mb_rs_xml_to_data(output_file)
-                setcolorder(result_df, c('DATE', 'TIME', 'HOUR', 'MARKET', 'ZONE', 'VARIABLE', 'FIELD', 'VALUE', 'UNIT'))
-            }
-            if (data_type == 'MB_PAltriServizi') {
-                result_df <- gme_mb_as_xml_to_data(output_file)
-                setcolorder(result_df, c('DATE', 'TIME', 'HOUR', 'MARKET', 'ZONE', 'VARIABLE', 'FIELD', 'VALUE', 'UNIT'))
-            }
-            if (data_type == 'MB_PTotali') {
-                result_df <- gme_mb_tl_xml_to_data(output_file)
-                setcolorder(result_df, c('DATE', 'TIME', 'HOUR', 'MARKET', 'ZONE', 'VARIABLE', 'FIELD', 'VALUE', 'UNIT'))
-            }
-            if (data_type == 'XBID_EsitiTotali') {
-                result_df <- gme_xbid_all_xml_to_data(output_file)
-                setcolorder(result_df, c('DATE', 'TIME', 'HOUR', 'MARKET', 'ZONE', 'VARIABLE', 'VALUE', 'UNIT'))
-            }
-            # Optionally remove the downloaded file after processing
+    downloaded = .try_download(file_url_ftps, h1)
+    if (!downloaded) {
+        if (isTRUE(verbose)) .msg_err("Implicit FTPS failed; trying explicit TLS on ftp:// ...")
+        downloaded = .try_download(file_url_ftp_explicit, h2)
+    }
+    if (!downloaded) {
+        .msg_err(sprintf("[ERROR] Download failed for %s (%s)", filename, data_type))
+        return(NULL)
+    }
+
+    .msg_ok("File downloaded successfully: ", output_file)
+
+    # ---- post-processing ----
+    if (isFALSE(raw)) {
+        result_df = tryCatch({
+            df =
+                if (data_type == "MSD_ServiziDispacciamento") {
+                    out = gme_msd_all_xml_to_data(output_file)
+                    setcolorder(out, c("DATE","TIME","HOUR","MARKET","ZONE","VARIABLE","VALUE","UNIT"))
+                    out
+                } else if (data_type == "MB_PRiservaSecondaria") {
+                    out = gme_mb_rs_xml_to_data(output_file)
+                    setcolorder(out, c("DATE","TIME","HOUR","MARKET","ZONE","VARIABLE","FIELD","VALUE","UNIT"))
+                    out
+                } else if (data_type == "MB_PAltriServizi") {
+                    out = gme_mb_as_xml_to_data(output_file)
+                    setcolorder(out, c("DATE","TIME","HOUR","MARKET","ZONE","VARIABLE","FIELD","VALUE","UNIT"))
+                    out
+                } else if (data_type == "MB_PTotali") {
+                    out = gme_mb_tl_xml_to_data(output_file)
+                    setcolorder(out, c("DATE","TIME","HOUR","MARKET","ZONE","VARIABLE","FIELD","VALUE","UNIT"))
+                    out
+                } else if (data_type == "XBID_EsitiTotali") {
+                    out = gme_xbid_all_xml_to_data(output_file)
+                    setcolorder(out, c("DATE","TIME","HOUR","MARKET","ZONE","VARIABLE","VALUE","UNIT"))
+                    out
+                }
+            df
+        }, error = function(e) {
+            .msg_err("[ERROR] XML processing failed: ", e$message)
+            NULL
+        })
+
+        if (is.null(result_df)) {
+            .msg_err("[ERROR] An error occurred; result_df is NULL.")
         } else {
-            result_df <- FALSE
+            .msg_ok("[OK] Processing completed successfully.")
         }
 
-        result_df
-    }, error = function(e) {
-        # Handle errors (e.g., failed download or XML processing)
-        message(crayon::red("[ERROR] Error downloading file: ", filename, " - ", e$message))
-        result_df = NULL
-        result_df
-    })
-
-    if (is.null(result_df)) {
-        message(crayon::red("[ERROR] An error occurred; result_df is NULL."))
-    } else {
-        message(crayon::green("[OK] Processing completed successfully."))
-    }
-
-    if(isFALSE(raw)) {
-        file.remove(output_file)
+        # Remove the raw file after parsing
+        try(suppressWarnings(file.remove(output_file)), silent = TRUE)
         return(result_df)
+
     } else {
-        message(paste(crayon::green("[OK] XML File at:", output_file)))
+        .msg_ok("[OK] XML File at: ", output_file)
         return(TRUE)
     }
-
-    } else {
-        message(crayon::red("[ERROR] Wrong Filename"))
-    }
-
 }
+
 
 
 
@@ -1977,55 +2169,76 @@ gme_xbid_all_xml_to_data <- function(xml_file_path) {
 #' files <- gme_mgp_get_files(data_type = "MGP_Prezzi", verbose = TRUE)
 #' }
 #' @export
-gme_offers_get_files <- function(data_type, output_dir = "data",
-                              username = "PIASARACENO", password = "18N15C9R",
-                              verbose = FALSE) {
+gme_offers_get_files = function(data_type,
+                                output_dir = "data",
+                                username = "PIASARACENO",
+                                password = "18N15C9R",
+                                host = "download.ipex.it",
+                                verbose = FALSE) {
 
-    allowed_data_types = c("MGP", "MSD", "MB",
-                           "MI-A1", "MI-A2", "MI-A3", "XBID")
-
-    # Validate data_type
+    allowed_data_types = c("MGP","MSD","MB","MI-A1","MI-A2","MI-A3","XBID")
     if (!data_type %in% allowed_data_types) {
         stop(paste("Invalid data_type:", data_type,
                    ". Must be one of:", paste(allowed_data_types, collapse = ", ")))
     }
 
-    mkt_data_type = paste0(data_type, '_OffertePubbliche/')
+    patterns = list(
+        MGP   = "\\S+MGPOffertePubbliche\\.zip$",
+        MSD   = "\\S+MSDOffertePubbliche\\.zip$",
+        MB    = "\\S+MBOffertePubbliche\\.zip$",
+        `MI-A1` = "\\S+MI-A1OffertePubbliche\\.zip$",
+        `MI-A2` = "\\S+MI-A2OffertePubbliche\\.zip$",
+        `MI-A3` = "\\S+MI-A3OffertePubbliche\\.zip$",
+        XBID  = "\\S+XBIDOffertePubbliche\\.zip$"
+    )
+    file_pattern = patterns[[data_type]]
 
-    url_base = paste0('ftp://download.mercatoelettrico.org/MercatiElettrici/', mkt_data_type, '/')
+    if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
 
-    if (data_type == "MGP") {file_pattern = "\\S+MGPOffertePubbliche\\.zip$"}
-    if (data_type == "MSD") {file_pattern = "\\S+MSDOffertePubbliche\\.zip$"}
-    if (data_type == "MB") {file_pattern = "\\S+MBOffertePubbliche\\.zip$"}
-    if (data_type == "MI-A1") {file_pattern = "\\S+MI-A1OffertePubbliche\\.zip$"}
-    if (data_type == "MI-A2") {file_pattern = "\\S+MI-A2OffertePubbliche\\.zip$"}
-    if (data_type == "MI-A3") {file_pattern = "\\S+MI-A3OffertePubbliche\\.zip$"}
-    if (data_type == "XBID") {file_pattern = "\\S+XBIDOffertePubbliche\\.zip$"}
+    # Path must end with a single trailing slash
+    path = sprintf("MercatiElettrici/%s_OffertePubbliche/", data_type)
 
-    # Ensure output directory exists
-    if (!dir.exists(output_dir)) {
-        dir.create(output_dir, recursive = TRUE)
+    # 1) implicit FTPS (port 990)
+    url_ftps = sprintf("ftps://%s/%s", host, path)
+    args1 = c(
+        "-sS", "--fail", "--ftp-pasv", "--list-only",
+        "-u", sprintf("%s:%s", username, password),
+        url_ftps
+    )
+    out = tryCatch(system2("curl", args1, stdout = TRUE, stderr = TRUE),
+                   error = function(e) structure(conditionMessage(e), class = "curl_err"))
+
+    # 2) fallback: explicit TLS over FTP:21
+    if (inherits(out, "curl_err") || length(out) == 0) {
+        url_ftp = sprintf("ftp://%s/%s", host, path)
+        args2 = c(
+            "-sS", "--fail", "--ftp-pasv", "--list-only", "--ssl",
+            "-u", sprintf("%s:%s", username, password),
+            url_ftp
+        )
+        out = tryCatch(system2("curl", args2, stdout = TRUE, stderr = TRUE),
+                       error = function(e) structure(conditionMessage(e), class = "curl_err"))
     }
 
-    # List files on the FTP server
-    tryCatch({
-        ftp_list_cmd <- paste0("curl -u ", username, ":", password, " ", url_base)
-        file_list <- system(ftp_list_cmd, intern = TRUE)
-        matches <- regexpr(file_pattern, file_list)
-        files <- regmatches(file_list, matches)
-        files <- files[nzchar(files)]
+    if (inherits(out, "curl_err") || length(out) == 0) {
+        stop(paste0("Directory listing failed for ", data_type, ". Curl said:\n", paste(out, collapse = "\n")))
+    }
 
-        # Print available files
-        if(isTRUE(verbose)) {
+    files = out[nchar(out) > 0]
+    files = files[grepl(file_pattern, files)]
+
+    if (isTRUE(verbose)) {
+        if (requireNamespace("crayon", quietly = TRUE)) {
             message(crayon::green("Available files:"))
             print(files)
+            message(crayon::green("[OK] Available files listed."))
+        } else {
+            message("Available files:")
+            print(files)
+            message("[OK] Available files listed.")
         }
-        message(crayon::green("[OK] Available files download."))
-        return(files)
-    }, error = function(e) {
-        message(crayon::red("[ERROR] Error downloading filenames from GME directory", e$message))
-        return(NULL)
-    })
+    }
+
     return(files)
 }
 
@@ -2059,93 +2272,143 @@ gme_offers_get_files <- function(data_type, output_dir = "data",
 #' @import data.table
 #' @importFrom xml2 read_xml xml_find_all xml_text
 #' @export
-gme_download_offers_file <- function(filename, data_type = 'MGP', output_dir, username, password, raw = FALSE) {
+gme_download_offers_file = function(filename,
+                                    data_type = "MGP",
+                                    output_dir,
+                                    username,
+                                    password,
+                                    raw = FALSE,
+                                    host = "download.ipex.it",
+                                    verbose = FALSE,
+                                    tries = 2) {
 
-    # List of allowed data types
-    allowed_data_types <- c("MGP", "MSD", "MB", "MI-A1", "MI-A2", "MI-A3", "XBID")
-
-    # Validate the input data_type
+    allowed_data_types = c("MGP","MSD","MB","MI-A1","MI-A2","MI-A3","XBID")
     if (!data_type %in% allowed_data_types) {
         stop(paste("Invalid data_type:", data_type, ". Must be one of:", paste(allowed_data_types, collapse = ", ")))
     }
 
-    # Validate filename
     validated_filename = gme_validate_filename(filename = filename, num_digits = 8, file_extension = "zip")
-    if(isTRUE(validated_filename)) {
-
-    # Construct the file URL
-    mkt_data_type <- paste0(data_type, '_OffertePubbliche/')
-    url_base <- paste0('ftp://download.mercatoelettrico.org/MercatiElettrici/', mkt_data_type)
-    file_url <- paste0(url_base, filename)
-
-    # Construct the output file path
-    output_file <- file.path(output_dir, filename)
-
-    # Create a curl handle
-    h <- curl::new_handle()
-    curl::handle_setopt(h, .list = list(
-        userpwd = paste0(username, ":", password),
-        ftp_use_epsv = TRUE  # Use passive mode for FTP
-    ))
-
-    # Attempt to download and process the file
-    result_df <- tryCatch({
-        # Download the file
-        curl::curl_download(file_url, output_file, handle = h)
-        message(crayon::green("File downloaded successfully: ", output_file))
-
-        # Check if the downloaded file is a zip
-        if (!grepl("\\.zip$", filename)) {
-            stop("Expected a .zip file, but got: ", filename)
-        }
-
-        # Unzip the file
-        files_in_zip <- unzip(output_file, list = TRUE)
-        if (nrow(files_in_zip) == 0) {
-            stop("The zip file contains no files.")
-        }
-
-        # Extract contents and remove the zip
-        unzip(output_file, exdir = output_dir)
-        file.remove(output_file)
-
-        # Locate the XML file
-        xml_files <- list.files(output_dir, pattern = "\\.xml$", full.names = TRUE)
-        if (length(xml_files) == 0) {
-            stop("No XML files found after extracting the zip.")
-        }
-        xml_file_name <- xml_files[1]  # Assume the first XML file
-
-        # Process the XML file
-        if (!raw) {
-                result_df <- gme_offerts_zip_to_data(xml_file_name)
-        } else {
-            message(crayon::yellow("Raw mode: Skipping processing of XML file."))
-            result_df <- NULL
-        }
-
-        result_df
-    }, error = function(e) {
-        # Handle errors
-        message(crayon::red("[ERROR] Error occurred: ", e$message))
-        NULL
-    })
-
-    # Cleanup and return results
-    if (!raw && !is.null(result_df)) {
-        message(crayon::green("Cleaning up intermediate files."))
-        file.remove(xml_file_name)
-    } else if (raw) {
-        message(paste(crayon::green("[OK] Raw XML file available at:", xml_file_name)))
+    if (!isTRUE(validated_filename)) {
+        if (requireNamespace("crayon", quietly = TRUE)) message(crayon::red("[ERROR] Wrong Filename")) else message("[ERROR] Wrong Filename")
+        return(NULL)
     }
 
-    return(result_df)
+    if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
+    zip_path = file.path(output_dir, filename)
+    extract_dir = file.path(output_dir, tools::file_path_sans_ext(basename(filename)))
+    if (!dir.exists(extract_dir)) dir.create(extract_dir, recursive = TRUE)
+
+    .ok  = function(...) if (requireNamespace("crayon", quietly = TRUE)) message(crayon::green(...)) else message(...)
+    .err = function(...) if (requireNamespace("crayon", quietly = TRUE)) message(crayon::red(...))   else message(...)
+    .warn= function(...) if (requireNamespace("crayon", quietly = TRUE)) message(crayon::yellow(...)) else message(...)
+
+    path = sprintf("MercatiElettrici/%s_OffertePubbliche/%s", data_type, filename)
+
+    # Attempt 1: implicit FTPS (990)
+    url_ftps = sprintf("ftps://%s/%s", host, path)
+    h1 = curl::new_handle()
+    curl::handle_setopt(h1,
+                        userpwd = sprintf("%s:%s", username, password),
+                        ftp_use_epsv = TRUE,
+                        connecttimeout = 30L,
+                        low_speed_time = 30L,
+                        low_speed_limit = 1L,
+                        verbose = isTRUE(verbose)
+    )
+
+    # Attempt 2: explicit TLS on FTP:21
+    url_ftp_tls = sprintf("ftp://%s/%s", host, path)
+    h2 = curl::new_handle()
+    curl::handle_setopt(h2,
+                        userpwd = sprintf("%s:%s", username, password),
+                        ftp_use_epsv = TRUE,
+                        use_ssl = 3L,  # CURLUSESSL_ALL
+                        connecttimeout = 30L,
+                        low_speed_time = 30L,
+                        low_speed_limit = 1L,
+                        verbose = isTRUE(verbose)
+    )
+
+    .try_download = function(url, handle) {
+        for (i in seq_len(tries)) {
+            ok = tryCatch({
+                curl::curl_download(url, zip_path, handle = handle, mode = "wb")
+                TRUE
+            }, error = function(e) {
+                if (isTRUE(verbose)) .err(sprintf("[ERROR] Try %d failed: %s", i, e$message))
+                FALSE
+            })
+            if (ok) return(TRUE)
+            Sys.sleep(1)
+        }
+        FALSE
+    }
+
+    downloaded = .try_download(url_ftps, h1)
+    if (!downloaded) {
+        if (isTRUE(verbose)) .warn("Implicit FTPS failed; trying explicit TLS on ftp:// ...")
+        downloaded = .try_download(url_ftp_tls, h2)
+    }
+    if (!downloaded) {
+        .err(sprintf("[ERROR] Download failed for %s (%s)", filename, data_type))
+        return(NULL)
+    }
+    .ok("File downloaded successfully: ", zip_path)
+
+    # Ensure it is a zip
+    if (!grepl("\\.zip$", filename, ignore.case = TRUE)) {
+        .err("Expected a .zip file, got: ", filename)
+        return(NULL)
+    }
+
+    # List & extract
+    zlist = tryCatch(unzip(zip_path, list = TRUE), error = function(e) NULL)
+    if (is.null(zlist) || nrow(zlist) == 0) {
+        .err("The zip file contains no files.")
+        return(NULL)
+    }
+    tryCatch(unzip(zip_path, exdir = extract_dir), error = function(e) {
+        .err("Unzip failed: ", e$message); return(NULL)
+    })
+    # remove the zip after extraction
+    try(suppressWarnings(file.remove(zip_path)), silent = TRUE)
+
+    # Find XML(s)
+    xml_files = list.files(extract_dir, pattern = "\\.xml$", full.names = TRUE, recursive = TRUE)
+    if (length(xml_files) == 0) {
+        .err("No XML files found after extracting the zip.")
+        return(NULL)
+    }
+    if (length(xml_files) > 1) .warn(sprintf("Multiple XML files found (%d). Using the first: %s", length(xml_files), basename(xml_files[1])))
+
+    xml_file = xml_files[1]
+
+    if (isFALSE(raw)) {
+        result_df = tryCatch({
+            df = gme_offerts_zip_to_data(xml_file)
+            df
+        }, error = function(e) {
+            .err("[ERROR] XML processing failed: ", e$message)
+            NULL
+        })
+
+        if (is.null(result_df)) {
+            .err("[ERROR] An error occurred; result_df is NULL.")
+            return(NULL)
+        } else {
+            .ok("[OK] Processing completed successfully.")
+        }
+
+        # cleanup extracted XML after successful parse
+        try(suppressWarnings(unlink(extract_dir, recursive = TRUE)), silent = TRUE)
+        return(result_df)
 
     } else {
-        message(crayon::red("[ERROR] Wrong Filename"))
+        .ok("[OK] Raw mode: extracted at: ", extract_dir)
+        return(TRUE)
     }
-
 }
+
 
 
 # Define the function
