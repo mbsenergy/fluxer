@@ -1,7 +1,7 @@
 Package: fluxer
 Type: Package
 Title: FLUX Collection of Functions and Utilities
-Version: 0.9.5
+Version: 0.9.8
 Authors@R: 
     person(given = "Alejandro",
            family = "Abraham",

@@ -1,4 +1,3 @@
-
 # GME Directory -----------------------------------------------------------------------------------------------
 
 #' Retrieve FTP Directory Listing from GME
@@ -15,22 +14,25 @@
 #' }
 #' @export
 gme_get_directory = function(
-        username = "PIASARACENO",
-        password = "18N15C9R",
-        host = "download.ipex.it",
-        path = "MercatiElettrici/"
+    username = "PIASARACENO",
+    password = "18N15C9R",
+    host = "download.ipex.it",
+    path = "MercatiElettrici/"
 ) {
-    url = sprintf("ftps://%s/%s", host, path)  # implicit TLS (990)
+    url = sprintf("ftps://%s/%s", host, path) # implicit TLS (990)
     args = c(
-        "-sS",            # silent progress, show errors
-        "--fail",         # non-2xx => error
+        "-sS", # silent progress, show errors
+        "--fail", # non-2xx => error
         "--ftp-pasv",
-        "--list-only",    # names only
-        "-u", sprintf("%s:%s", username, password),
+        "--list-only", # names only
+        "-u",
+        sprintf("%s:%s", username, password),
         url
     )
-    out = tryCatch(system2("curl", args, stdout = TRUE, stderr = TRUE),
-                   error = function(e) stop(conditionMessage(e)))
+    out = tryCatch(
+        system2("curl", args, stdout = TRUE, stderr = TRUE),
+        error = function(e) stop(conditionMessage(e))
+    )
     data.table(name = out[nchar(out) > 0])
 }
 
@@ -57,23 +59,36 @@ gme_get_directory = function(
 #' files <- gme_mgp_get_files(data_type = "MGP_Prezzi", verbose = TRUE)
 #' }
 #' @export
-gme_mgp_get_files = function(data_type,
-                             output_dir = "data",
-                             username = "PIASARACENO",
-                             password = "18N15C9R",
-                             host = "download.ipex.it",
-                             verbose = FALSE) {
-
-    allowed_data_types = c("MGP_Prezzi", "MGP_Quantita", "MGP_Fabbisogno",
-                           "MGP_Liquidita", "MGP_Transiti", "MGP_LimitiTransito")
+gme_mgp_get_files = function(
+    data_type,
+    output_dir = "data",
+    username = "PIASARACENO",
+    password = "18N15C9R",
+    host = "download.ipex.it",
+    verbose = FALSE
+) {
+    allowed_data_types = c(
+        "MGP_Prezzi",
+        "MGP_Prezzi15",
+        "MGP_Quantita",
+        "MGP_Fabbisogno",
+        "MGP_Liquidita",
+        "MGP_Transiti",
+        "MGP_LimitiTransito"
+    )
 
     if (!data_type %in% allowed_data_types) {
-        stop(paste("Invalid data_type:", data_type,
-                   ". Must be one of:", paste(allowed_data_types, collapse = ", ")))
+        stop(paste(
+            "Invalid data_type:",
+            data_type,
+            ". Must be one of:",
+            paste(allowed_data_types, collapse = ", ")
+        ))
     }
 
     patterns = list(
         MGP_Prezzi = "\\S+MGPPrezzi\\.xml$",
+        MGP_Prezzi15 = "\\S+MGPPrezzi15\\.xml$",
         MGP_Quantita = "\\S+MGPQuantita\\.xml$",
         MGP_Fabbisogno = "\\S+MGPFabbisogno\\.xml$",
         MGP_Liquidita = "\\S+MGPLiquidita\\.xml$",
@@ -82,34 +97,54 @@ gme_mgp_get_files = function(data_type,
     )
     file_pattern = patterns[[data_type]]
 
-    if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
+    if (!dir.exists(output_dir)) {
+        dir.create(output_dir, recursive = TRUE)
+    }
 
     path = sprintf("MercatiElettrici/%s/", data_type)
 
     # 1) Try implicit FTPS (port 990)
     url_ftps = sprintf("ftps://%s/%s", host, path)
     args1 = c(
-        "-sS", "--fail", "--ftp-pasv", "--list-only",
-        "-u", sprintf("%s:%s", username, password),
+        "-sS",
+        "--fail",
+        "--list-only",
+        "-u",
+        sprintf("%s:%s", username, password),
         url_ftps
     )
-    out = tryCatch(system2("curl", args1, stdout = TRUE, stderr = TRUE),
-                   error = function(e) structure(conditionMessage(e), class = "curl_err"))
+    out = tryCatch(
+        system2("curl", args1, stdout = TRUE, stderr = TRUE),
+        error = function(e) structure(conditionMessage(e), class = "curl_err")
+    )
 
     # 2) Fallback: explicit TLS on port 21 (some networks prefer this)
     if (inherits(out, "curl_err") || length(out) == 0) {
         url_ftp = sprintf("ftp://%s/%s", host, path)
         args2 = c(
-            "-sS", "--fail", "--ftp-pasv", "--list-only", "--ssl",
-            "-u", sprintf("%s:%s", username, password),
+            "-sS",
+            "--fail",
+            "--list-only",
+            "--ssl",
+            "-u",
+            sprintf("%s:%s", username, password),
             url_ftp
         )
-        out = tryCatch(system2("curl", args2, stdout = TRUE, stderr = TRUE),
-                       error = function(e) structure(conditionMessage(e), class = "curl_err"))
+        out = tryCatch(
+            system2("curl", args2, stdout = TRUE, stderr = TRUE),
+            error = function(e) {
+                structure(conditionMessage(e), class = "curl_err")
+            }
+        )
     }
 
     if (inherits(out, "curl_err") || length(out) == 0) {
-        stop(paste0("Directory listing failed for ", data_type, ". Curl said:\n", paste(out, collapse = "\n")))
+        stop(paste0(
+            "Directory listing failed for ",
+            data_type,
+            ". Curl said:\n",
+            paste(out, collapse = "\n")
+        ))
     }
 
     # Filter names by the requested pattern
@@ -132,7 +167,6 @@ gme_mgp_get_files = function(data_type,
 
     return(files)
 }
-
 
 
 #' Download and Process MGP Data File
@@ -163,38 +197,70 @@ gme_mgp_get_files = function(data_type,
 #' @import data.table
 #' @importFrom xml2 read_xml xml_find_all xml_text
 #' @export
-mgp_download_file = function(filename,
-                             data_type = "MGP_Prezzi",
-                             output_dir,
-                             username,
-                             password,
-                             raw = FALSE,
-                             host = "download.ipex.it",
-                             verbose = FALSE,
-                             tries = 2) {
-
-    allowed_data_types = c("MGP_Prezzi","MGP_Quantita","MGP_Fabbisogno",
-                           "MGP_Liquidita","MGP_Transiti","MGP_LimitiTransito")
+mgp_download_file = function(
+    filename,
+    data_type = "MGP_Prezzi",
+    output_dir,
+    username,
+    password,
+    raw = FALSE,
+    host = "download.ipex.it",
+    verbose = FALSE,
+    tries = 2
+) {
+    allowed_data_types = c(
+        "MGP_Prezzi",
+        "MGP_Prezzi15",
+        "MGP_Quantita",
+        "MGP_Fabbisogno",
+        "MGP_Liquidita",
+        "MGP_Transiti",
+        "MGP_LimitiTransito"
+    )
     if (!data_type %in% allowed_data_types) {
-        stop(paste("Invalid data_type:", data_type,
-                   ". Must be one of:", paste(allowed_data_types, collapse = ", ")))
+        stop(paste(
+            "Invalid data_type:",
+            data_type,
+            ". Must be one of:",
+            paste(allowed_data_types, collapse = ", ")
+        ))
     }
 
     # Validate filename (your helper)
-    validated_filename = gme_validate_filename(filename = filename, num_digits = 8, file_extension = "xml")
+    validated_filename = gme_validate_filename(
+        filename = filename,
+        num_digits = 8,
+        file_extension = "xml"
+    )
     if (!isTRUE(validated_filename)) {
         if (requireNamespace("crayon", quietly = TRUE)) {
             message(crayon::red("[ERROR] Wrong Filename"))
-        } else message("[ERROR] Wrong Filename")
+        } else {
+            message("[ERROR] Wrong Filename")
+        }
         return(NULL)
     }
 
-    if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
+    if (!dir.exists(output_dir)) {
+        dir.create(output_dir, recursive = TRUE)
+    }
     output_file = file.path(output_dir, filename)
 
     # ---- helpers ------------------------------------------------------------
-    .msg_ok  = function(...) if (requireNamespace("crayon", quietly = TRUE)) message(crayon::green(...)) else message(...)
-    .msg_err = function(...) if (requireNamespace("crayon", quietly = TRUE)) message(crayon::red(...))   else message(...)
+    .msg_ok = function(...) {
+        if (requireNamespace("crayon", quietly = TRUE)) {
+            message(crayon::green(...))
+        } else {
+            message(...)
+        }
+    }
+    .msg_err = function(...) {
+        if (requireNamespace("crayon", quietly = TRUE)) {
+            message(crayon::red(...))
+        } else {
+            message(...)
+        }
+    }
 
     path = sprintf("MercatiElettrici/%s/%s", data_type, filename)
 
@@ -202,41 +268,59 @@ mgp_download_file = function(filename,
     file_url_ftps = sprintf("ftps://%s/%s", host, path)
 
     h1 = curl::new_handle()
-    curl::handle_setopt(h1,
-                        userpwd = sprintf("%s:%s", username, password),
-                        ftp_use_epsv = TRUE,         # passive mode
-                        connecttimeout = 30L,
-                        low_speed_time = 30L,
-                        low_speed_limit = 1L,
-                        verbose = isTRUE(verbose)
+    curl::handle_setopt(
+        h1,
+        userpwd = sprintf("%s:%s", username, password),
+        ftp_use_epsv = TRUE, # passive mode
+        connecttimeout = 30L,
+        low_speed_time = 30L,
+        low_speed_limit = 1L,
+        verbose = isTRUE(verbose)
     )
 
     # attempt 2: explicit TLS (FTP over port 21 with TLS negotiation)
     file_url_ftp_explicit = sprintf("ftp://%s/%s", host, path)
     h2 = curl::new_handle()
-    curl::handle_setopt(h2,
-                        userpwd = sprintf("%s:%s", username, password),
-                        ftp_use_epsv = TRUE,
-                        use_ssl = 3L,                # CURLOPT_USE_SSL = CURLUSESSL_ALL
-                        # Optional: prefer TLS for control/data
-                        # ftpsslauth = 1L,           # 1=TLS (if your libcurl supports it)
-                        connecttimeout = 30L,
-                        low_speed_time = 30L,
-                        low_speed_limit = 1L,
-                        verbose = isTRUE(verbose)
+    curl::handle_setopt(
+        h2,
+        userpwd = sprintf("%s:%s", username, password),
+        ftp_use_epsv = TRUE,
+        use_ssl = 3L, # CURLOPT_USE_SSL = CURLUSESSL_ALL
+        # Optional: prefer TLS for control/data
+        # ftpsslauth = 1L,           # 1=TLS (if your libcurl supports it)
+        connecttimeout = 30L,
+        low_speed_time = 30L,
+        low_speed_limit = 1L,
+        verbose = isTRUE(verbose)
     )
 
     # download with fallback + simple retry loop
     .try_download = function(url, handle) {
         for (i in seq_len(tries)) {
-            ok = tryCatch({
-                curl::curl_download(url, output_file, handle = handle, mode = "wb")
-                TRUE
-            }, error = function(e) {
-                if (isTRUE(verbose)) .msg_err(sprintf("[ERROR] Try %d failed: %s", i, e$message))
-                FALSE
-            })
-            if (ok) return(TRUE)
+            ok = tryCatch(
+                {
+                    curl::curl_download(
+                        url,
+                        output_file,
+                        handle = handle,
+                        mode = "wb"
+                    )
+                    TRUE
+                },
+                error = function(e) {
+                    if (isTRUE(verbose)) {
+                        .msg_err(sprintf(
+                            "[ERROR] Try %d failed: %s",
+                            i,
+                            e$message
+                        ))
+                    }
+                    FALSE
+                }
+            )
+            if (ok) {
+                return(TRUE)
+            }
             Sys.sleep(1)
         }
         FALSE
@@ -244,12 +328,18 @@ mgp_download_file = function(filename,
 
     downloaded = .try_download(file_url_ftps, h1)
     if (!downloaded) {
-        if (isTRUE(verbose)) .msg_err("Implicit FTPS failed; trying explicit TLS on ftp:// ...")
+        if (isTRUE(verbose)) {
+            .msg_err("Implicit FTPS failed; trying explicit TLS on ftp:// ...")
+        }
         downloaded = .try_download(file_url_ftp_explicit, h2)
     }
 
     if (!downloaded) {
-        .msg_err(sprintf("[ERROR] Download failed for %s (%s)", filename, data_type))
+        .msg_err(sprintf(
+            "[ERROR] Download failed for %s (%s)",
+            filename,
+            data_type
+        ))
         return(NULL)
     }
 
@@ -258,31 +348,117 @@ mgp_download_file = function(filename,
     # ---- post-processing ----------------------------------------------------
     result_df = NULL
     if (isFALSE(raw)) {
-        result_df = tryCatch({
-            if (data_type == "MGP_Prezzi") {
-                df = gme_dam_price_xml_to_data(output_file)
-                setcolorder(df, c("DATE","TIME","HOUR","MARKET","ZONE","VALUE","UNIT"))
-            } else if (data_type == "MGP_Quantita") {
-                df = gme_dam_quantity_xml_to_data(output_file)
-                setcolorder(df, c("DATE","TIME","HOUR","MARKET","ZONE","VALUE","UNIT"))
-            } else if (data_type == "MGP_Fabbisogno") {
-                df = gme_dam_fabb_xml_to_data(output_file)
-                setcolorder(df, c("DATE","TIME","HOUR","MARKET","ZONE","VALUE","UNIT"))
-            } else if (data_type == "MGP_Liquidita") {
-                df = gme_dam_liq_xml_to_data(output_file)
-                setcolorder(df, c("DATE","TIME","HOUR","MARKET","ZONE","VALUE","UNIT"))
-            } else if (data_type == "MGP_Transiti") {
-                df = gme_dam_tran_xml_to_data(output_file)
-                setcolorder(df, c("DATE","TIME","HOUR","MARKET","ZONE","VALUE","UNIT"))
-            } else if (data_type == "MGP_LimitiTransito") {
-                df = gme_dam_limtran_xml_to_data(output_file)
-                setcolorder(df, c("DATE","TIME","HOUR","MARKET","ZONE","VARIABLE","VALUE","UNIT"))
+        result_df = tryCatch(
+            {
+                if (data_type == "MGP_Prezzi") {
+                    df = gme_dam_price_xml_to_data(output_file)
+                    setcolorder(
+                        df,
+                        c(
+                            "DATE",
+                            "TIME",
+                            "HOUR",
+                            "MARKET",
+                            "ZONE",
+                            "VALUE",
+                            "UNIT"
+                        )
+                    )
+                } else if (data_type == "MGP_Prezzi15") {
+                    df = gme_dam_price15_xml_to_data(output_file)
+                    setcolorder(
+                        df,
+                        c(
+                            "DATE",
+                            "TIME",
+                            "HOUR",
+                            "INTERVAL",
+                            "MTU",
+                            "MARKET",
+                            "ZONE",
+                            "VALUE",
+                            "UNIT"
+                        )
+                    )
+                } else if (data_type == "MGP_Quantita") {
+                    df = gme_dam_quantity_xml_to_data(output_file)
+                    setcolorder(
+                        df,
+                        c(
+                            "DATE",
+                            "TIME",
+                            "HOUR",
+                            "MARKET",
+                            "ZONE",
+                            "VALUE",
+                            "UNIT"
+                        )
+                    )
+                } else if (data_type == "MGP_Fabbisogno") {
+                    df = gme_dam_fabb_xml_to_data(output_file)
+                    setcolorder(
+                        df,
+                        c(
+                            "DATE",
+                            "TIME",
+                            "HOUR",
+                            "MARKET",
+                            "ZONE",
+                            "VALUE",
+                            "UNIT"
+                        )
+                    )
+                } else if (data_type == "MGP_Liquidita") {
+                    df = gme_dam_liq_xml_to_data(output_file)
+                    setcolorder(
+                        df,
+                        c(
+                            "DATE",
+                            "TIME",
+                            "HOUR",
+                            "MARKET",
+                            "ZONE",
+                            "VALUE",
+                            "UNIT"
+                        )
+                    )
+                } else if (data_type == "MGP_Transiti") {
+                    df = gme_dam_tran_xml_to_data(output_file)
+                    setcolorder(
+                        df,
+                        c(
+                            "DATE",
+                            "TIME",
+                            "HOUR",
+                            "MARKET",
+                            "ZONE",
+                            "VALUE",
+                            "UNIT"
+                        )
+                    )
+                } else if (data_type == "MGP_LimitiTransito") {
+                    df = gme_dam_limtran_xml_to_data(output_file)
+                    setcolorder(
+                        df,
+                        c(
+                            "DATE",
+                            "TIME",
+                            "HOUR",
+                            "MARKET",
+                            "ZONE",
+                            "VARIABLE",
+                            "VALUE",
+                            "UNIT"
+                        )
+                    )
+                }
+                df
+            },
+            error = function(e) {
+                .msg_err("[ERROR] XML processing failed: ", e$message)
+                NULL
             }
-            df
-        }, error = function(e) {
-            .msg_err("[ERROR] XML processing failed: ", e$message)
-            NULL
-        })
+        )
 
         if (is.null(result_df)) {
             .msg_err("[ERROR] An error occurred; result_df is NULL.")
@@ -293,7 +469,6 @@ mgp_download_file = function(filename,
         # remove raw file after parsing
         try(suppressWarnings(file.remove(output_file)), silent = TRUE)
         return(result_df)
-
     } else {
         .msg_ok("[OK] XML File at: ", output_file)
         return(TRUE)
@@ -331,7 +506,6 @@ mgp_download_file = function(filename,
 #' @noRd
 
 gme_dam_price_xml_to_data <- function(xml_file_path) {
-
     xml_data <- read_xml(xml_file_path)
 
     prezzi_nodes <- xml_find_all(xml_data, ".//Prezzi")
@@ -367,11 +541,32 @@ gme_dam_price_xml_to_data <- function(xml_file_path) {
 
         # Return the extracted data as a named list
         list(
-            Data = data, Mercato = mercato, Ora = ora, PUN = pun, NAT = nat, CALA = cala,
-            CNOR = cnor, CSUD = csud, NORD = nord, SARD = sard, SICI = sici, SUD = sud,
-            AUST = aust, COAC = coac, COUP = coup, CORS = cors, FRAN = fran, GREC = grec,
-            SLOV = slov, SVIZ = sviz, BSP = bsp, MALT = malt, XAUS = xaus, XFRA = xfra,
-            MONT = mont, XGRE = xgre
+            Data = data,
+            Mercato = mercato,
+            Ora = ora,
+            PUN = pun,
+            NAT = nat,
+            CALA = cala,
+            CNOR = cnor,
+            CSUD = csud,
+            NORD = nord,
+            SARD = sard,
+            SICI = sici,
+            SUD = sud,
+            AUST = aust,
+            COAC = coac,
+            COUP = coup,
+            CORS = cors,
+            FRAN = fran,
+            GREC = grec,
+            SLOV = slov,
+            SVIZ = sviz,
+            BSP = bsp,
+            MALT = malt,
+            XAUS = xaus,
+            XFRA = xfra,
+            MONT = mont,
+            XGRE = xgre
         )
     })
 
@@ -381,13 +576,176 @@ gme_dam_price_xml_to_data <- function(xml_file_path) {
     data_df[, Data := as.Date(Data, format = "%Y%m%d")]
     data_df[, TIME := paste0(sprintf("%02d", as.numeric(Ora)), ":00")]
     setnames(data_df, c('Data', 'Mercato', 'Ora'), c('DATE', 'MARKET', 'HOUR'))
-    data_df_lg <- melt(data_df, id.vars = c('DATE', 'TIME', 'HOUR', 'MARKET'), variable.factor = FALSE, variable.name = 'ZONE', value.name = 'VALUE')
+    data_df_lg <- melt(
+        data_df,
+        id.vars = c('DATE', 'TIME', 'HOUR', 'MARKET'),
+        variable.factor = FALSE,
+        variable.name = 'ZONE',
+        value.name = 'VALUE'
+    )
     data_df_lg[, VALUE := as.numeric(gsub(",", ".", VALUE))]
     data_df_lg[, UNIT := 'EUR']
 
     data_df_lg = unique(data_df_lg)
 
     return(data_df_lg)
+}
+
+
+# Define the function
+#' Process XML data and return a data frame in long format
+#'
+#' This function reads an XML file containing pricing data, extracts relevant fields
+#' from the XML structure, reshapes the data into a long format, and returns the data
+#' as a data frame.
+#'
+#' @param xml_file_path A string representing the path to the XML file to be processed.
+#'
+#' @return A data frame in long format containing the following columns:
+#'   - `DATE`: The date of the data.
+#'   - `MARKET`: The market type (e.g., "PUN", "NAT").
+#'   - `HOUR`: The time (hour) of the data.
+#'   - `ZONE`: The zone of the data (e.g., "CNOR", "CSUD").
+#'   - `VALUE`: The corresponding value for the zone (numeric).
+#'   - `UNIT`: A constant value for the unit, which is always "EUR".
+#'
+#' @examples
+#' # Specify the XML file path (update with actual file path)
+#' xml_file_path <- "path/to/your/xml/file.xml"
+#'
+#' # Call the function and store the result in a data frame
+#' result_df <- gme_dam_price15_xml_to_data(xml_file_path)
+#'
+#' # Print the resulting data frame
+#' print(result_df)
+#' @export
+#' @noRd
+gme_dam_price15_xml_to_data = function(xml_file_path) {
+    get_txt = function(nd, tag_opts) {
+        # tag_opts can be a single tag or a vector of alternatives
+        for (tg in tag_opts) {
+            x = xml_find_first(nd, paste0(".//", tg))
+            if (!inherits(x, "xml_missing")) return(xml_text(x))
+        }
+        return(NA_character_)
+    }
+
+    zone_tags = c(
+        "PUN",
+        "NAT",
+        "CALA",
+        "CNOR",
+        "CSUD",
+        "NORD",
+        "SARD",
+        "SICI",
+        "SUD",
+        "AUST",
+        "COAC",
+        "COUP",
+        "CORS",
+        "FRAN",
+        "GREC",
+        "SLOV",
+        "SVIZ",
+        "BSP",
+        "MALT",
+        "XAUS",
+        "XFRA",
+        "MONT",
+        "XGRE"
+    )
+
+    xml_data = read_xml(xml_file_path)
+    prezzi_nodes = xml_find_all(xml_data, ".//Prezzi15")
+
+    if (length(prezzi_nodes) == 0L) {
+        return(data.table(
+            DATE = as.Date(character()),
+            TIME = character(),
+            HOUR = integer(),
+            INTERVAL = integer(),
+            MTU = character(),
+            MARKET = character(),
+            ZONE = character(),
+            VALUE = numeric(),
+            UNIT = character()
+        ))
+    }
+
+    data_list = lapply(prezzi_nodes, function(nd) {
+        DATE = get_txt(nd, "Data")
+        MARKET = get_txt(nd, "Mercato")
+        PERIODO = get_txt(nd, "Periodo")
+        MTU = get_txt(nd, c("Granularita", "Granularity")) # accept IT/EN
+
+        p = suppressWarnings(as.integer(PERIODO))
+        # compute HOUR / INTERVAL / TIME from Periodo (1..96)
+        if (!is.na(p)) {
+            hr = (p - 1L) %/% 4L
+            iv = ((p - 1L) %% 4L) + 1L
+            mm = (iv - 1L) * 15L
+            TIME = sprintf("%02d:%02d", hr, mm)
+            HOUR = hr
+            INTERVAL = iv
+        } else {
+            # fallback: missing Periodo (shouldn't happen in *15 files)
+            HOUR = NA_integer_
+            INTERVAL = NA_integer_
+            TIME = NA_character_
+        }
+
+        vals = setNames(
+            lapply(zone_tags, function(z) get_txt(nd, z)),
+            zone_tags
+        )
+
+        c(
+            list(
+                DATE = DATE,
+                MARKET = MARKET,
+                HOUR = HOUR,
+                INTERVAL = INTERVAL,
+                TIME = TIME,
+                MTU = MTU
+            ),
+            vals
+        )
+    })
+
+    dt = rbindlist(lapply(data_list, as.data.table), fill = TRUE)
+
+    # types & reshape
+    dt[, DATE := as.Date(DATE, format = "%Y%m%d")]
+
+    dt_long = melt(
+        dt,
+        id.vars = c("DATE", "TIME", "HOUR", "INTERVAL", "MTU", "MARKET"),
+        measure.vars = zone_tags,
+        variable.name = "ZONE",
+        value.name = "VALUE",
+        variable.factor = FALSE
+    )
+
+    dt_long[, VALUE := as.numeric(gsub(",", ".", VALUE, fixed = TRUE))]
+    dt_long[, UNIT := "EUR"]
+    setcolorder(
+        dt_long,
+        c(
+            "DATE",
+            "TIME",
+            "HOUR",
+            "INTERVAL",
+            "MTU",
+            "MARKET",
+            "ZONE",
+            "VALUE",
+            "UNIT"
+        )
+    )
+    dt_long = unique(dt_long)
+
+    return(dt_long)
 }
 
 
@@ -431,7 +789,6 @@ gme_dam_price_xml_to_data <- function(xml_file_path) {
 #' @import xml2
 #' @export
 gme_dam_quantity_xml_to_data <- function(xml_file_path) {
-
     xml_data <- read_xml(xml_file_path)
 
     quantita_nodes <- xml_find_all(xml_data, ".//Quantita")
@@ -446,7 +803,7 @@ gme_dam_quantity_xml_to_data <- function(xml_file_path) {
         quantity_fields <- xml_children(node)
         quantities <- sapply(quantity_fields, function(child) {
             value <- xml_text(child)
-            gsub(",", ".", value)  # Convert commas to dots for numeric conversion
+            gsub(",", ".", value) # Convert commas to dots for numeric conversion
         })
 
         # Combine extracted fields into a named list
@@ -458,26 +815,70 @@ gme_dam_quantity_xml_to_data <- function(xml_file_path) {
     data_dt <- data_dt[, -(1:3), with = FALSE]
 
     # Standardize column names
-    quantita_elements <- c('DATE', 'MARKET', 'HOUR',
-        "TOTALE_ACQUISTI", "NAT_ACQUISTI", "CALA_ACQUISTI", "CNOR_ACQUISTI",
-        "CSUD_ACQUISTI", "NORD_ACQUISTI", "SARD_ACQUISTI", "SICI_ACQUISTI",
-        "SUD_ACQUISTI", "AUST_ACQUISTI", "COAC_ACQUISTI", "COUP_ACQUISTI",
-        "CORS_ACQUISTI", "FRAN_ACQUISTI", "GREC_ACQUISTI", "SLOV_ACQUISTI",
-        "SVIZ_ACQUISTI", "BSP_ACQUISTI", "MALT_ACQUISTI", "XAUS_ACQUISTI",
-        "XFRA_ACQUISTI", "MONT_ACQUISTI", "XGRE_ACQUISTI", "TOTALE_VENDITE",
-        "NAT_VENDITE", "CALA_VENDITE", "CNOR_VENDITE", "CSUD_VENDITE",
-        "NORD_VENDITE", "SARD_VENDITE", "SICI_VENDITE", "SUD_VENDITE",
-        "AUST_VENDITE", "COAC_VENDITE", "COUP_VENDITE", "CORS_VENDITE",
-        "FRAN_VENDITE", "GREC_VENDITE", "SLOV_VENDITE", "SVIZ_VENDITE",
-        "BSP_VENDITE", "MALT_VENDITE", "XAUS_VENDITE", "XFRA_VENDITE",
-        "MONT_VENDITE", "XGRE_VENDITE", "TOTITABSP_VENDITE", "TOTITABSP_ACQUISTI", 'INTERVAL_NO'
+    quantita_elements <- c(
+        'DATE',
+        'MARKET',
+        'HOUR',
+        "TOTALE_ACQUISTI",
+        "NAT_ACQUISTI",
+        "CALA_ACQUISTI",
+        "CNOR_ACQUISTI",
+        "CSUD_ACQUISTI",
+        "NORD_ACQUISTI",
+        "SARD_ACQUISTI",
+        "SICI_ACQUISTI",
+        "SUD_ACQUISTI",
+        "AUST_ACQUISTI",
+        "COAC_ACQUISTI",
+        "COUP_ACQUISTI",
+        "CORS_ACQUISTI",
+        "FRAN_ACQUISTI",
+        "GREC_ACQUISTI",
+        "SLOV_ACQUISTI",
+        "SVIZ_ACQUISTI",
+        "BSP_ACQUISTI",
+        "MALT_ACQUISTI",
+        "XAUS_ACQUISTI",
+        "XFRA_ACQUISTI",
+        "MONT_ACQUISTI",
+        "XGRE_ACQUISTI",
+        "TOTALE_VENDITE",
+        "NAT_VENDITE",
+        "CALA_VENDITE",
+        "CNOR_VENDITE",
+        "CSUD_VENDITE",
+        "NORD_VENDITE",
+        "SARD_VENDITE",
+        "SICI_VENDITE",
+        "SUD_VENDITE",
+        "AUST_VENDITE",
+        "COAC_VENDITE",
+        "COUP_VENDITE",
+        "CORS_VENDITE",
+        "FRAN_VENDITE",
+        "GREC_VENDITE",
+        "SLOV_VENDITE",
+        "SVIZ_VENDITE",
+        "BSP_VENDITE",
+        "MALT_VENDITE",
+        "XAUS_VENDITE",
+        "XFRA_VENDITE",
+        "MONT_VENDITE",
+        "XGRE_VENDITE",
+        "TOTITABSP_VENDITE",
+        "TOTITABSP_ACQUISTI",
+        'INTERVAL_NO'
     )
     setnames(data_dt, names(data_dt), quantita_elements)
 
     # Reshape the data to long format
-    data_dt_long <- melt(data_dt, id.vars = c("DATE", "MARKET", "HOUR", "INTERVAL_NO"),
-                         variable.name = "ZONE", value.name = "VALUE",
-                        variable.factor = FALSE)
+    data_dt_long <- melt(
+        data_dt,
+        id.vars = c("DATE", "MARKET", "HOUR", "INTERVAL_NO"),
+        variable.name = "ZONE",
+        value.name = "VALUE",
+        variable.factor = FALSE
+    )
 
     # Convert DATE and HOUR to proper formats
     data_dt_long[, DATE := as.Date(DATE, format = "%Y%m%d")]
@@ -493,8 +894,6 @@ gme_dam_quantity_xml_to_data <- function(xml_file_path) {
 
     return(data_dt_long)
 }
-
-
 
 
 #' Process GME DAM Fabbisogno XML Data
@@ -538,7 +937,6 @@ gme_dam_quantity_xml_to_data <- function(xml_file_path) {
 #' @import xml2
 #' @export
 gme_dam_fabb_xml_to_data <- function(xml_file_path) {
-
     # Read the XML file
     xml_data <- read_xml(xml_file_path)
 
@@ -568,7 +966,13 @@ gme_dam_fabb_xml_to_data <- function(xml_file_path) {
     data_df[, Data := as.Date(Data, format = "%Y%m%d")]
     data_df[, TIME := paste0(sprintf("%02d", as.numeric(Ora)), ":00")]
     setnames(data_df, c('Data', 'Mercato', 'Ora'), c('DATE', 'MARKET', 'HOUR'))
-    data_df_lg <- melt(data_df, id.vars = c('DATE', 'TIME', 'HOUR', 'MARKET'), variable.factor = FALSE, variable.name = 'ZONE', value.name = 'VALUE')
+    data_df_lg <- melt(
+        data_df,
+        id.vars = c('DATE', 'TIME', 'HOUR', 'MARKET'),
+        variable.factor = FALSE,
+        variable.name = 'ZONE',
+        value.name = 'VALUE'
+    )
     data_df_lg[, VALUE := as.numeric(gsub(",", ".", VALUE))]
     data_df_lg[, UNIT := 'MWh']
 
@@ -576,7 +980,6 @@ gme_dam_fabb_xml_to_data <- function(xml_file_path) {
 
     return(data_df_lg)
 }
-
 
 
 #' Process GME DAM Liquidity XML Data
@@ -620,7 +1023,6 @@ gme_dam_fabb_xml_to_data <- function(xml_file_path) {
 #' @import xml2
 #' @export
 gme_dam_liq_xml_to_data <- function(xml_file_path) {
-
     # Read the XML file
     xml_data <- read_xml(xml_file_path)
 
@@ -632,13 +1034,23 @@ gme_dam_liq_xml_to_data <- function(xml_file_path) {
         Data = xml_text(xml_find_all(dati_nodes, "./Data")),
         Mercato = xml_text(xml_find_all(dati_nodes, "./Mercato")),
         Ora = as.integer(xml_text(xml_find_all(dati_nodes, "./Ora"))),
-        Liquidita = as.numeric(gsub(",", ".", xml_text(xml_find_all(dati_nodes, "./Liquidita"))))
+        Liquidita = as.numeric(gsub(
+            ",",
+            ".",
+            xml_text(xml_find_all(dati_nodes, "./Liquidita"))
+        ))
     )
 
     data_df[, Data := as.Date(Data, format = "%Y%m%d")]
     data_df[, TIME := paste0(sprintf("%02d", as.numeric(Ora)), ":00")]
     setnames(data_df, c('Data', 'Mercato', 'Ora'), c('DATE', 'MARKET', 'HOUR'))
-    data_df_lg <- melt(data_df, id.vars = c('DATE', 'TIME', 'HOUR', 'MARKET'), variable.factor = FALSE, variable.name = 'ZONE', value.name = 'VALUE')
+    data_df_lg <- melt(
+        data_df,
+        id.vars = c('DATE', 'TIME', 'HOUR', 'MARKET'),
+        variable.factor = FALSE,
+        variable.name = 'ZONE',
+        value.name = 'VALUE'
+    )
     data_df_lg[, VALUE := as.numeric(gsub(",", ".", VALUE))]
     data_df_lg[, UNIT := 'MWh']
 
@@ -646,7 +1058,6 @@ gme_dam_liq_xml_to_data <- function(xml_file_path) {
 
     return(data_df_lg)
 }
-
 
 
 #' Process GME DAM Transiti XML Data
@@ -690,7 +1101,6 @@ gme_dam_liq_xml_to_data <- function(xml_file_path) {
 #' @import xml2
 #' @export
 gme_dam_tran_xml_to_data <- function(xml_file_path) {
-
     # Read the XML file
     xml_data <- read_xml(xml_file_path)
 
@@ -704,7 +1114,11 @@ gme_dam_tran_xml_to_data <- function(xml_file_path) {
         Ora = as.integer(xml_text(xml_find_all(transiti_nodes, "./Ora"))),
         Da = xml_text(xml_find_all(transiti_nodes, "./Da")),
         A = xml_text(xml_find_all(transiti_nodes, "./A")),
-        VALUE = as.numeric(gsub(",", ".", xml_text(xml_find_all(transiti_nodes, "./TransitoMWh"))))
+        VALUE = as.numeric(gsub(
+            ",",
+            ".",
+            xml_text(xml_find_all(transiti_nodes, "./TransitoMWh"))
+        ))
     )
 
     data_df[, Data := as.Date(Data, format = "%Y%m%d")]
@@ -733,7 +1147,6 @@ gme_dam_tran_xml_to_data <- function(xml_file_path) {
 
     return(melted_data)
 }
-
 
 
 #' Process GME DAM Limiti Transiti XML Data
@@ -777,7 +1190,6 @@ gme_dam_tran_xml_to_data <- function(xml_file_path) {
 #' @import xml2
 #' @export
 gme_dam_limtran_xml_to_data <- function(xml_file_path) {
-
     # Read the XML file
     xml_data <- read_xml(xml_file_path)
 
@@ -791,8 +1203,16 @@ gme_dam_limtran_xml_to_data <- function(xml_file_path) {
         Ora = as.integer(xml_text(xml_find_all(transiti_nodes, "./Ora"))),
         Da = xml_text(xml_find_all(transiti_nodes, "./Da")),
         A = xml_text(xml_find_all(transiti_nodes, "./A")),
-        Limite = as.numeric(gsub(",", ".", xml_text(xml_find_all(transiti_nodes, "./Limite")))),
-        Coefficiente = as.numeric(gsub(",", ".", xml_text(xml_find_all(transiti_nodes, "./Coefficiente"))))
+        Limite = as.numeric(gsub(
+            ",",
+            ".",
+            xml_text(xml_find_all(transiti_nodes, "./Limite"))
+        )),
+        Coefficiente = as.numeric(gsub(
+            ",",
+            ".",
+            xml_text(xml_find_all(transiti_nodes, "./Coefficiente"))
+        ))
     )
 
     data_df[, Data := as.Date(Data, format = "%Y%m%d")]
@@ -833,8 +1253,6 @@ gme_dam_limtran_xml_to_data <- function(xml_file_path) {
 }
 
 
-
-
 # MI ----------------------------------------------------------------------------------------------
 
 #' Retrieve List of Available GME MI Market XML Files from FTP
@@ -862,59 +1280,92 @@ gme_dam_limtran_xml_to_data <- function(xml_file_path) {
 #' @export
 library(data.table)
 
-gme_mi_get_files = function(data_type,
-                            output_dir = "data",
-                            username = "PIASARACENO",
-                            password = "18N15C9R",
-                            host = "download.ipex.it",
-                            verbose = FALSE) {
-
-    allowed_data_types = c("MI-A1_Prezzi","MI-A2_Prezzi","MI-A3_Prezzi",
-                           "MI-A1_Quantita","MI-A2_Quantita","MI-A3_Quantita")
+gme_mi_get_files = function(
+    data_type,
+    output_dir = "data",
+    username = "PIASARACENO",
+    password = "18N15C9R",
+    host = "download.ipex.it",
+    verbose = FALSE
+) {
+    allowed_data_types = c(
+        "MI-A1_Prezzi",
+        "MI-A2_Prezzi",
+        "MI-A3_Prezzi",
+        "MI-A1_Quantita",
+        "MI-A2_Quantita",
+        "MI-A3_Quantita"
+    )
 
     if (!data_type %in% allowed_data_types) {
-        stop(paste("Invalid data_type:", data_type,
-                   ". Must be one of:", paste(allowed_data_types, collapse = ", ")))
+        stop(paste(
+            "Invalid data_type:",
+            data_type,
+            ". Must be one of:",
+            paste(allowed_data_types, collapse = ", ")
+        ))
     }
 
     patterns = list(
-        `MI-A1_Prezzi`    = "\\S+MI-A1Prezzi\\.xml$",
-        `MI-A2_Prezzi`    = "\\S+MI-A2Prezzi\\.xml$",
-        `MI-A3_Prezzi`    = "\\S+MI-A3Prezzi\\.xml$",
-        `MI-A1_Quantita`  = "\\S+MI-A1Quantita\\.xml$",
-        `MI-A2_Quantita`  = "\\S+MI-A2Quantita\\.xml$",
-        `MI-A3_Quantita`  = "\\S+MI-A3Quantita\\.xml$"
+        `MI-A1_Prezzi` = "\\S+MI-A1Prezzi\\.xml$",
+        `MI-A2_Prezzi` = "\\S+MI-A2Prezzi\\.xml$",
+        `MI-A3_Prezzi` = "\\S+MI-A3Prezzi\\.xml$",
+        `MI-A1_Quantita` = "\\S+MI-A1Quantita\\.xml$",
+        `MI-A2_Quantita` = "\\S+MI-A2Quantita\\.xml$",
+        `MI-A3_Quantita` = "\\S+MI-A3Quantita\\.xml$"
     )
     file_pattern = patterns[[data_type]]
 
-    if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
+    if (!dir.exists(output_dir)) {
+        dir.create(output_dir, recursive = TRUE)
+    }
 
     path = sprintf("MercatiElettrici/%s/", data_type)
 
     # 1) implicit FTPS (port 990)
     url_ftps = sprintf("ftps://%s/%s", host, path)
     args1 = c(
-        "-sS", "--fail", "--ftp-pasv", "--list-only",
-        "-u", sprintf("%s:%s", username, password),
+        "-sS",
+        "--fail",
+        "--ftp-pasv",
+        "--list-only",
+        "-u",
+        sprintf("%s:%s", username, password),
         url_ftps
     )
-    out = tryCatch(system2("curl", args1, stdout = TRUE, stderr = TRUE),
-                   error = function(e) structure(conditionMessage(e), class = "curl_err"))
+    out = tryCatch(
+        system2("curl", args1, stdout = TRUE, stderr = TRUE),
+        error = function(e) structure(conditionMessage(e), class = "curl_err")
+    )
 
     # 2) fallback: explicit TLS over FTP (port 21)
     if (inherits(out, "curl_err") || length(out) == 0) {
         url_ftp = sprintf("ftp://%s/%s", host, path)
         args2 = c(
-            "-sS", "--fail", "--ftp-pasv", "--list-only", "--ssl",
-            "-u", sprintf("%s:%s", username, password),
+            "-sS",
+            "--fail",
+            "--ftp-pasv",
+            "--list-only",
+            "--ssl",
+            "-u",
+            sprintf("%s:%s", username, password),
             url_ftp
         )
-        out = tryCatch(system2("curl", args2, stdout = TRUE, stderr = TRUE),
-                       error = function(e) structure(conditionMessage(e), class = "curl_err"))
+        out = tryCatch(
+            system2("curl", args2, stdout = TRUE, stderr = TRUE),
+            error = function(e) {
+                structure(conditionMessage(e), class = "curl_err")
+            }
+        )
     }
 
     if (inherits(out, "curl_err") || length(out) == 0) {
-        stop(paste0("Directory listing failed for ", data_type, ". Curl said:\n", paste(out, collapse = "\n")))
+        stop(paste0(
+            "Directory listing failed for ",
+            data_type,
+            ". Curl said:\n",
+            paste(out, collapse = "\n")
+        ))
     }
 
     files = out[nchar(out) > 0]
@@ -934,7 +1385,6 @@ gme_mi_get_files = function(data_type,
 
     return(files)
 }
-
 
 
 #' Download and Parse GME MI Market XML File
@@ -968,75 +1418,124 @@ gme_mi_get_files = function(data_type,
 #' The function checks for valid file name format and supported `data_type`. After downloading,
 #' it calls the appropriate parser: `gme_mi_price_xml_to_data()` or `gme_mi_qty_x
 #' @export
-mi_download_file = function(filename,
-                            data_type = "MI-A1_Prezzi",
-                            output_dir,
-                            username,
-                            password,
-                            raw = FALSE,
-                            host = "download.ipex.it",
-                            verbose = FALSE,
-                            tries = 2) {
-
-    allowed_data_types = c("MI-A1_Prezzi","MI-A2_Prezzi","MI-A3_Prezzi",
-                           "MI-A1_Quantita","MI-A2_Quantita","MI-A3_Quantita")
+mi_download_file = function(
+    filename,
+    data_type = "MI-A1_Prezzi",
+    output_dir,
+    username,
+    password,
+    raw = FALSE,
+    host = "download.ipex.it",
+    verbose = FALSE,
+    tries = 2
+) {
+    allowed_data_types = c(
+        "MI-A1_Prezzi",
+        "MI-A2_Prezzi",
+        "MI-A3_Prezzi",
+        "MI-A1_Quantita",
+        "MI-A2_Quantita",
+        "MI-A3_Quantita"
+    )
     if (!data_type %in% allowed_data_types) {
-        stop(paste("Invalid data_type:", data_type,
-                   ". Must be one of:", paste(allowed_data_types, collapse = ", ")))
+        stop(paste(
+            "Invalid data_type:",
+            data_type,
+            ". Must be one of:",
+            paste(allowed_data_types, collapse = ", ")
+        ))
     }
 
     # Validate filename
-    validated_filename = gme_validate_filename(filename = filename, num_digits = 8, file_extension = "xml")
+    validated_filename = gme_validate_filename(
+        filename = filename,
+        num_digits = 8,
+        file_extension = "xml"
+    )
     if (!isTRUE(validated_filename)) {
         if (requireNamespace("crayon", quietly = TRUE)) {
             message(crayon::red("[ERROR] Wrong Filename"))
-        } else message("[ERROR] Wrong Filename")
+        } else {
+            message("[ERROR] Wrong Filename")
+        }
         return(NULL)
     }
 
-    if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
+    if (!dir.exists(output_dir)) {
+        dir.create(output_dir, recursive = TRUE)
+    }
     output_file = file.path(output_dir, filename)
 
-    .msg_ok  = function(...) if (requireNamespace("crayon", quietly = TRUE)) message(crayon::green(...)) else message(...)
-    .msg_err = function(...) if (requireNamespace("crayon", quietly = TRUE)) message(crayon::red(...))   else message(...)
+    .msg_ok = function(...) {
+        if (requireNamespace("crayon", quietly = TRUE)) {
+            message(crayon::green(...))
+        } else {
+            message(...)
+        }
+    }
+    .msg_err = function(...) {
+        if (requireNamespace("crayon", quietly = TRUE)) {
+            message(crayon::red(...))
+        } else {
+            message(...)
+        }
+    }
 
     path = sprintf("MercatiElettrici/%s/%s", data_type, filename)
 
     # Attempt 1: implicit FTPS (port 990 via scheme)
     file_url_ftps = sprintf("ftps://%s/%s", host, path)
     h1 = curl::new_handle()
-    curl::handle_setopt(h1,
-                        userpwd = sprintf("%s:%s", username, password),
-                        ftp_use_epsv = TRUE,
-                        connecttimeout = 30L,
-                        low_speed_time = 30L,
-                        low_speed_limit = 1L,
-                        verbose = isTRUE(verbose)
+    curl::handle_setopt(
+        h1,
+        userpwd = sprintf("%s:%s", username, password),
+        ftp_use_epsv = TRUE,
+        connecttimeout = 30L,
+        low_speed_time = 30L,
+        low_speed_limit = 1L,
+        verbose = isTRUE(verbose)
     )
 
     # Attempt 2: explicit TLS (FTP:21 + TLS)
     file_url_ftp_explicit = sprintf("ftp://%s/%s", host, path)
     h2 = curl::new_handle()
-    curl::handle_setopt(h2,
-                        userpwd = sprintf("%s:%s", username, password),
-                        ftp_use_epsv = TRUE,
-                        use_ssl = 3L, # CURLUSESSL_ALL
-                        connecttimeout = 30L,
-                        low_speed_time = 30L,
-                        low_speed_limit = 1L,
-                        verbose = isTRUE(verbose)
+    curl::handle_setopt(
+        h2,
+        userpwd = sprintf("%s:%s", username, password),
+        ftp_use_epsv = TRUE,
+        use_ssl = 3L, # CURLUSESSL_ALL
+        connecttimeout = 30L,
+        low_speed_time = 30L,
+        low_speed_limit = 1L,
+        verbose = isTRUE(verbose)
     )
 
     .try_download = function(url, handle) {
         for (i in seq_len(tries)) {
-            ok = tryCatch({
-                curl::curl_download(url, output_file, handle = handle, mode = "wb")
-                TRUE
-            }, error = function(e) {
-                if (isTRUE(verbose)) .msg_err(sprintf("[ERROR] Try %d failed: %s", i, e$message))
-                FALSE
-            })
-            if (ok) return(TRUE)
+            ok = tryCatch(
+                {
+                    curl::curl_download(
+                        url,
+                        output_file,
+                        handle = handle,
+                        mode = "wb"
+                    )
+                    TRUE
+                },
+                error = function(e) {
+                    if (isTRUE(verbose)) {
+                        .msg_err(sprintf(
+                            "[ERROR] Try %d failed: %s",
+                            i,
+                            e$message
+                        ))
+                    }
+                    FALSE
+                }
+            )
+            if (ok) {
+                return(TRUE)
+            }
             Sys.sleep(1)
         }
         FALSE
@@ -1044,11 +1543,17 @@ mi_download_file = function(filename,
 
     downloaded = .try_download(file_url_ftps, h1)
     if (!downloaded) {
-        if (isTRUE(verbose)) .msg_err("Implicit FTPS failed; trying explicit TLS on ftp:// ...")
+        if (isTRUE(verbose)) {
+            .msg_err("Implicit FTPS failed; trying explicit TLS on ftp:// ...")
+        }
         downloaded = .try_download(file_url_ftp_explicit, h2)
     }
     if (!downloaded) {
-        .msg_err(sprintf("[ERROR] Download failed for %s (%s)", filename, data_type))
+        .msg_err(sprintf(
+            "[ERROR] Download failed for %s (%s)",
+            filename,
+            data_type
+        ))
         return(NULL)
     }
 
@@ -1057,19 +1562,47 @@ mi_download_file = function(filename,
     # Post-processing
     result_df = NULL
     if (isFALSE(raw)) {
-        result_df = tryCatch({
-            if (data_type %in% c("MI-A1_Prezzi","MI-A2_Prezzi","MI-A3_Prezzi")) {
-                df = gme_mi_price_xml_to_data(output_file)
-                setcolorder(df, c("DATE","TIME","HOUR","MARKET","ZONE","VALUE","UNIT"))
-            } else {
-                df = gme_mi_qty_xml_to_data(output_file)
-                setcolorder(df, c("DATE","TIME","HOUR","MARKET","ZONE","VALUE","UNIT"))
+        result_df = tryCatch(
+            {
+                if (
+                    data_type %in%
+                        c("MI-A1_Prezzi", "MI-A2_Prezzi", "MI-A3_Prezzi")
+                ) {
+                    df = gme_mi_price_xml_to_data(output_file)
+                    setcolorder(
+                        df,
+                        c(
+                            "DATE",
+                            "TIME",
+                            "HOUR",
+                            "MARKET",
+                            "ZONE",
+                            "VALUE",
+                            "UNIT"
+                        )
+                    )
+                } else {
+                    df = gme_mi_qty_xml_to_data(output_file)
+                    setcolorder(
+                        df,
+                        c(
+                            "DATE",
+                            "TIME",
+                            "HOUR",
+                            "MARKET",
+                            "ZONE",
+                            "VALUE",
+                            "UNIT"
+                        )
+                    )
+                }
+                df
+            },
+            error = function(e) {
+                .msg_err("[ERROR] XML processing failed: ", e$message)
+                NULL
             }
-            df
-        }, error = function(e) {
-            .msg_err("[ERROR] XML processing failed: ", e$message)
-            NULL
-        })
+        )
 
         if (is.null(result_df)) {
             .msg_err("[ERROR] An error occurred; result_df is NULL.")
@@ -1080,13 +1613,11 @@ mi_download_file = function(filename,
         # Remove the raw file after parsing
         try(suppressWarnings(file.remove(output_file)), silent = TRUE)
         return(result_df)
-
     } else {
         .msg_ok("[OK] XML File at: ", output_file)
         return(TRUE)
     }
 }
-
 
 
 #' Download and Parse GME MI Market XML File
@@ -1136,7 +1667,6 @@ mi_download_file = function(filename,
 #' @export
 
 gme_mi_price_xml_to_data <- function(xml_file_path) {
-
     xml_data <- read_xml(xml_file_path)
 
     prezzi_nodes <- xml_find_all(xml_data, ".//Prezzi")
@@ -1172,11 +1702,32 @@ gme_mi_price_xml_to_data <- function(xml_file_path) {
 
         # Return the extracted data as a named list
         list(
-            Data = data, Mercato = mercato, Ora = ora, PUN = pun, NAT = nat, CALA = cala,
-            CNOR = cnor, CSUD = csud, NORD = nord, SARD = sard, SICI = sici, SUD = sud,
-            AUST = aust, COAC = coac, COUP = coup, CORS = cors, FRAN = fran, GREC = grec,
-            SLOV = slov, SVIZ = sviz, BSP = bsp, MALT = malt, XAUS = xaus, XFRA = xfra,
-            MONT = mont, XGRE = xgre
+            Data = data,
+            Mercato = mercato,
+            Ora = ora,
+            PUN = pun,
+            NAT = nat,
+            CALA = cala,
+            CNOR = cnor,
+            CSUD = csud,
+            NORD = nord,
+            SARD = sard,
+            SICI = sici,
+            SUD = sud,
+            AUST = aust,
+            COAC = coac,
+            COUP = coup,
+            CORS = cors,
+            FRAN = fran,
+            GREC = grec,
+            SLOV = slov,
+            SVIZ = sviz,
+            BSP = bsp,
+            MALT = malt,
+            XAUS = xaus,
+            XFRA = xfra,
+            MONT = mont,
+            XGRE = xgre
         )
     })
 
@@ -1186,14 +1737,20 @@ gme_mi_price_xml_to_data <- function(xml_file_path) {
     data_df[, Data := as.Date(Data, format = "%Y%m%d")]
     data_df[, TIME := paste0(sprintf("%02d", as.numeric(Ora)), ":00")]
     setnames(data_df, c('Data', 'Mercato', 'Ora'), c('DATE', 'MARKET', 'HOUR'))
-    data_df_lg <- melt(data_df, id.vars = c('DATE', 'TIME', 'HOUR', 'MARKET'), variable.factor = FALSE, variable.name = 'ZONE', value.name = 'VALUE')
+    data_df_lg <- melt(
+        data_df,
+        id.vars = c('DATE', 'TIME', 'HOUR', 'MARKET'),
+        variable.factor = FALSE,
+        variable.name = 'ZONE',
+        value.name = 'VALUE'
+    )
     data_df_lg[, VALUE := as.numeric(gsub(",", ".", VALUE))]
     data_df_lg[, UNIT := 'EUR']
 
     data_df_lg = unique(data_df_lg)
 
     return(data_df_lg)
-  }
+}
 
 
 #' Parse GME MI Quantità XML File to Long-Format Data Table
@@ -1229,7 +1786,6 @@ gme_mi_price_xml_to_data <- function(xml_file_path) {
 #'
 #' @export
 gme_mi_qty_xml_to_data <- function(xml_file_path) {
-
     xml_data <- read_xml(xml_file_path)
 
     quantita_nodes <- xml_find_all(xml_data, ".//Quantita")
@@ -1244,7 +1800,7 @@ gme_mi_qty_xml_to_data <- function(xml_file_path) {
         quantity_fields <- xml_children(node)
         quantities <- sapply(quantity_fields, function(child) {
             value <- xml_text(child)
-            gsub(",", ".", value)  # Convert commas to dots for numeric conversion
+            gsub(",", ".", value) # Convert commas to dots for numeric conversion
         })
 
         # Combine extracted fields into a named list
@@ -1255,44 +1811,117 @@ gme_mi_qty_xml_to_data <- function(xml_file_path) {
     data_dt <- rbindlist(data_list, fill = TRUE)
     data_dt <- data_dt[, -(1:3), with = FALSE]
 
-    if(ncol(data_dt) == 49) {
-    quantita_elements = c(
-    "DATE", "MARKET", "HOUR",
-    "TOTALE_ACQUISTI", "NAT_ACQUISTI", "CALA_ACQUISTI", "CNOR_ACQUISTI",
-    "CSUD_ACQUISTI", "NORD_ACQUISTI", "SARD_ACQUISTI", "SICI_ACQUISTI",
-    "SUD_ACQUISTI", "AUST_ACQUISTI", "COAC_ACQUISTI", "COUP_ACQUISTI",
-    "CORS_ACQUISTI", "FRAN_ACQUISTI", "GREC_ACQUISTI", "SLOV_ACQUISTI",
-    "SVIZ_ACQUISTI", "BSP_ACQUISTI", "MALT_ACQUISTI", "MONT_ACQUISTI",
-    "XGRE_ACQUISTI", "XAUS_ACQUISTI", "XFRA_ACQUISTI",
-    "TOTALE_VENDITE", "NAT_VENDITE", "CALA_VENDITE", "CNOR_VENDITE",
-    "CSUD_VENDITE", "NORD_VENDITE", "SARD_VENDITE", "SICI_VENDITE",
-    "SUD_VENDITE", "AUST_VENDITE", "COAC_VENDITE", "COUP_VENDITE",
-    "CORS_VENDITE", "FRAN_VENDITE", "GREC_VENDITE", "SLOV_VENDITE",
-    "SVIZ_VENDITE", "BSP_VENDITE", "MALT_VENDITE", "MONT_VENDITE",
-    "XGRE_VENDITE", "XAUS_VENDITE", "XFRA_VENDITE"
-    )
+    if (ncol(data_dt) == 49) {
+        quantita_elements = c(
+            "DATE",
+            "MARKET",
+            "HOUR",
+            "TOTALE_ACQUISTI",
+            "NAT_ACQUISTI",
+            "CALA_ACQUISTI",
+            "CNOR_ACQUISTI",
+            "CSUD_ACQUISTI",
+            "NORD_ACQUISTI",
+            "SARD_ACQUISTI",
+            "SICI_ACQUISTI",
+            "SUD_ACQUISTI",
+            "AUST_ACQUISTI",
+            "COAC_ACQUISTI",
+            "COUP_ACQUISTI",
+            "CORS_ACQUISTI",
+            "FRAN_ACQUISTI",
+            "GREC_ACQUISTI",
+            "SLOV_ACQUISTI",
+            "SVIZ_ACQUISTI",
+            "BSP_ACQUISTI",
+            "MALT_ACQUISTI",
+            "MONT_ACQUISTI",
+            "XGRE_ACQUISTI",
+            "XAUS_ACQUISTI",
+            "XFRA_ACQUISTI",
+            "TOTALE_VENDITE",
+            "NAT_VENDITE",
+            "CALA_VENDITE",
+            "CNOR_VENDITE",
+            "CSUD_VENDITE",
+            "NORD_VENDITE",
+            "SARD_VENDITE",
+            "SICI_VENDITE",
+            "SUD_VENDITE",
+            "AUST_VENDITE",
+            "COAC_VENDITE",
+            "COUP_VENDITE",
+            "CORS_VENDITE",
+            "FRAN_VENDITE",
+            "GREC_VENDITE",
+            "SLOV_VENDITE",
+            "SVIZ_VENDITE",
+            "BSP_VENDITE",
+            "MALT_VENDITE",
+            "MONT_VENDITE",
+            "XGRE_VENDITE",
+            "XAUS_VENDITE",
+            "XFRA_VENDITE"
+        )
     } else {
-    quantita_elements <- c('DATE', 'MARKET', 'HOUR',
-        "TOTALE_ACQUISTI", "NAT_ACQUISTI", "CALA_ACQUISTI", "CNOR_ACQUISTI",
-        "CSUD_ACQUISTI", "NORD_ACQUISTI", "SARD_ACQUISTI", "SICI_ACQUISTI",
-        "SUD_ACQUISTI", "AUST_ACQUISTI", "COAC_ACQUISTI", "COUP_ACQUISTI",
-        "CORS_ACQUISTI", "FRAN_ACQUISTI", "GREC_ACQUISTI", "SLOV_ACQUISTI",
-        "SVIZ_ACQUISTI", "BSP_ACQUISTI", "MALT_ACQUISTI",
-        "MONT_ACQUISTI", "XGRE_ACQUISTI", "TOTALE_VENDITE",
-        "NAT_VENDITE", "CALA_VENDITE", "CNOR_VENDITE", "CSUD_VENDITE",
-        "NORD_VENDITE", "SARD_VENDITE", "SICI_VENDITE", "SUD_VENDITE",
-        "AUST_VENDITE", "COAC_VENDITE", "COUP_VENDITE", "CORS_VENDITE",
-        "FRAN_VENDITE", "GREC_VENDITE", "SLOV_VENDITE", "SVIZ_VENDITE",
-        "BSP_VENDITE", "MALT_VENDITE",
-        "MONT_VENDITE", "XGRE_VENDITE"
-    )
+        quantita_elements <- c(
+            'DATE',
+            'MARKET',
+            'HOUR',
+            "TOTALE_ACQUISTI",
+            "NAT_ACQUISTI",
+            "CALA_ACQUISTI",
+            "CNOR_ACQUISTI",
+            "CSUD_ACQUISTI",
+            "NORD_ACQUISTI",
+            "SARD_ACQUISTI",
+            "SICI_ACQUISTI",
+            "SUD_ACQUISTI",
+            "AUST_ACQUISTI",
+            "COAC_ACQUISTI",
+            "COUP_ACQUISTI",
+            "CORS_ACQUISTI",
+            "FRAN_ACQUISTI",
+            "GREC_ACQUISTI",
+            "SLOV_ACQUISTI",
+            "SVIZ_ACQUISTI",
+            "BSP_ACQUISTI",
+            "MALT_ACQUISTI",
+            "MONT_ACQUISTI",
+            "XGRE_ACQUISTI",
+            "TOTALE_VENDITE",
+            "NAT_VENDITE",
+            "CALA_VENDITE",
+            "CNOR_VENDITE",
+            "CSUD_VENDITE",
+            "NORD_VENDITE",
+            "SARD_VENDITE",
+            "SICI_VENDITE",
+            "SUD_VENDITE",
+            "AUST_VENDITE",
+            "COAC_VENDITE",
+            "COUP_VENDITE",
+            "CORS_VENDITE",
+            "FRAN_VENDITE",
+            "GREC_VENDITE",
+            "SLOV_VENDITE",
+            "SVIZ_VENDITE",
+            "BSP_VENDITE",
+            "MALT_VENDITE",
+            "MONT_VENDITE",
+            "XGRE_VENDITE"
+        )
     }
     setnames(data_dt, names(data_dt), quantita_elements)
 
     # Reshape the data to long format
-    data_dt_long <- melt(data_dt, id.vars = c("DATE", "MARKET", "HOUR"),
-                            variable.name = "ZONE", value.name = "VALUE",
-                        variable.factor = FALSE)
+    data_dt_long <- melt(
+        data_dt,
+        id.vars = c("DATE", "MARKET", "HOUR"),
+        variable.name = "ZONE",
+        value.name = "VALUE",
+        variable.factor = FALSE
+    )
 
     # Convert DATE and HOUR to proper formats
     data_dt_long[, DATE := as.Date(DATE, format = "%Y%m%d")]
@@ -1309,13 +1938,9 @@ gme_mi_qty_xml_to_data <- function(xml_file_path) {
 }
 
 
-
-
-
 # OTHER MARKETS ------------------------------------------------------------------------------------------------------
 
 ## MSD ------------------------------------------------------------------------------------------------------
-
 
 #' Retrieve Files from GME FTP Server for Other markets
 #'
@@ -1339,57 +1964,90 @@ gme_mi_qty_xml_to_data <- function(xml_file_path) {
 #' @export
 library(data.table)
 
-gme_rest_get_files = function(data_type,
-                              output_dir = "data",
-                              username = "PIASARACENO",
-                              password = "18N15C9R",
-                              host = "download.ipex.it",
-                              verbose = FALSE) {
-
-    allowed_data_types = c("MSD_ServiziDispacciamento",
-                           "MB_PRiservaSecondaria",
-                           "MB_PAltriServizi",
-                           "MB_PTotali",
-                           "XBID_EsitiTotali")
+gme_rest_get_files = function(
+    data_type,
+    output_dir = "data",
+    username = "PIASARACENO",
+    password = "18N15C9R",
+    host = "download.ipex.it",
+    verbose = FALSE
+) {
+    allowed_data_types = c(
+        "MSD_ServiziDispacciamento",
+        "MB_PRiservaSecondaria",
+        "MB_PAltriServizi",
+        "MB_PTotali",
+        "XBID_EsitiTotali"
+    )
 
     if (!data_type %in% allowed_data_types) {
-        stop(paste("Invalid data_type:", data_type,
-                   ". Must be one of:", paste(allowed_data_types, collapse = ", ")))
+        stop(paste(
+            "Invalid data_type:",
+            data_type,
+            ". Must be one of:",
+            paste(allowed_data_types, collapse = ", ")
+        ))
     }
 
     patterns = list(
         MSD_ServiziDispacciamento = "\\S+MSDServiziDispacciamento\\.xml$",
-        MB_PRiservaSecondaria      = "\\S+MBPRiservaSecondaria\\.xml$",
-        MB_PAltriServizi           = "\\S+MBPAltriServizi\\.xml$",
-        MB_PTotali                 = "\\S+MBPTotali\\.xml$",
-        XBID_EsitiTotali           = "\\S+XBIDEsitiTotali\\.xml$"
+        MB_PRiservaSecondaria = "\\S+MBPRiservaSecondaria\\.xml$",
+        MB_PAltriServizi = "\\S+MBPAltriServizi\\.xml$",
+        MB_PTotali = "\\S+MBPTotali\\.xml$",
+        XBID_EsitiTotali = "\\S+XBIDEsitiTotali\\.xml$"
     )
     file_pattern = patterns[[data_type]]
 
-    if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
+    if (!dir.exists(output_dir)) {
+        dir.create(output_dir, recursive = TRUE)
+    }
 
     path = sprintf("MercatiElettrici/%s/", data_type)
 
     # 1) implicit FTPS (port 990)
     url_ftps = sprintf("ftps://%s/%s", host, path)
-    args1 = c("-sS","--fail","--ftp-pasv","--list-only",
-              "-u", sprintf("%s:%s", username, password),
-              url_ftps)
-    out = tryCatch(system2("curl", args1, stdout = TRUE, stderr = TRUE),
-                   error = function(e) structure(conditionMessage(e), class = "curl_err"))
+    args1 = c(
+        "-sS",
+        "--fail",
+        "--ftp-pasv",
+        "--list-only",
+        "-u",
+        sprintf("%s:%s", username, password),
+        url_ftps
+    )
+    out = tryCatch(
+        system2("curl", args1, stdout = TRUE, stderr = TRUE),
+        error = function(e) structure(conditionMessage(e), class = "curl_err")
+    )
 
     # 2) fallback: explicit TLS on FTP:21
     if (inherits(out, "curl_err") || length(out) == 0) {
         url_ftp = sprintf("ftp://%s/%s", host, path)
-        args2 = c("-sS","--fail","--ftp-pasv","--list-only","--ssl",
-                  "-u", sprintf("%s:%s", username, password),
-                  url_ftp)
-        out = tryCatch(system2("curl", args2, stdout = TRUE, stderr = TRUE),
-                       error = function(e) structure(conditionMessage(e), class = "curl_err"))
+        args2 = c(
+            "-sS",
+            "--fail",
+            "--ftp-pasv",
+            "--list-only",
+            "--ssl",
+            "-u",
+            sprintf("%s:%s", username, password),
+            url_ftp
+        )
+        out = tryCatch(
+            system2("curl", args2, stdout = TRUE, stderr = TRUE),
+            error = function(e) {
+                structure(conditionMessage(e), class = "curl_err")
+            }
+        )
     }
 
     if (inherits(out, "curl_err") || length(out) == 0) {
-        stop(paste0("Directory listing failed for ", data_type, ". Curl said:\n", paste(out, collapse = "\n")))
+        stop(paste0(
+            "Directory listing failed for ",
+            data_type,
+            ". Curl said:\n",
+            paste(out, collapse = "\n")
+        ))
     }
 
     files = out[nchar(out) > 0]
@@ -1409,7 +2067,6 @@ gme_rest_get_files = function(data_type,
 
     return(files)
 }
-
 
 
 #' Download and Process Other Markets Data File
@@ -1440,75 +2097,122 @@ gme_rest_get_files = function(data_type,
 #' @import data.table
 #' @importFrom xml2 read_xml xml_find_all xml_text
 #' @export
-gme_other_download_file = function(filename,
-                                   data_type = "MSD_ServiziDispacciamento",
-                                   output_dir,
-                                   username,
-                                   password,
-                                   raw = FALSE,
-                                   host = "download.ipex.it",
-                                   verbose = FALSE,
-                                   tries = 2) {
-
-    allowed_data_types = c("MSD_ServiziDispacciamento",
-                           "MB_PRiservaSecondaria",
-                           "MB_PAltriServizi",
-                           "MB_PTotali",
-                           "XBID_EsitiTotali")
+gme_other_download_file = function(
+    filename,
+    data_type = "MSD_ServiziDispacciamento",
+    output_dir,
+    username,
+    password,
+    raw = FALSE,
+    host = "download.ipex.it",
+    verbose = FALSE,
+    tries = 2
+) {
+    allowed_data_types = c(
+        "MSD_ServiziDispacciamento",
+        "MB_PRiservaSecondaria",
+        "MB_PAltriServizi",
+        "MB_PTotali",
+        "XBID_EsitiTotali"
+    )
     if (!data_type %in% allowed_data_types) {
-        stop(paste("Invalid data_type:", data_type,
-                   ". Must be one of:", paste(allowed_data_types, collapse = ", ")))
+        stop(paste(
+            "Invalid data_type:",
+            data_type,
+            ". Must be one of:",
+            paste(allowed_data_types, collapse = ", ")
+        ))
     }
 
-    validated_filename = gme_validate_filename(filename = filename, num_digits = 8, file_extension = "xml")
+    validated_filename = gme_validate_filename(
+        filename = filename,
+        num_digits = 8,
+        file_extension = "xml"
+    )
     if (!isTRUE(validated_filename)) {
-        if (requireNamespace("crayon", quietly = TRUE)) message(crayon::red("[ERROR] Wrong Filename")) else message("[ERROR] Wrong Filename")
+        if (requireNamespace("crayon", quietly = TRUE)) {
+            message(crayon::red("[ERROR] Wrong Filename"))
+        } else {
+            message("[ERROR] Wrong Filename")
+        }
         return(NULL)
     }
 
-    if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
+    if (!dir.exists(output_dir)) {
+        dir.create(output_dir, recursive = TRUE)
+    }
     output_file = file.path(output_dir, filename)
 
-    .msg_ok  = function(...) if (requireNamespace("crayon", quietly = TRUE)) message(crayon::green(...)) else message(...)
-    .msg_err = function(...) if (requireNamespace("crayon", quietly = TRUE)) message(crayon::red(...))   else message(...)
+    .msg_ok = function(...) {
+        if (requireNamespace("crayon", quietly = TRUE)) {
+            message(crayon::green(...))
+        } else {
+            message(...)
+        }
+    }
+    .msg_err = function(...) {
+        if (requireNamespace("crayon", quietly = TRUE)) {
+            message(crayon::red(...))
+        } else {
+            message(...)
+        }
+    }
 
     path = sprintf("MercatiElettrici/%s/%s", data_type, filename)
 
     # Attempt 1: implicit FTPS (port 990)
     file_url_ftps = sprintf("ftps://%s/%s", host, path)
     h1 = curl::new_handle()
-    curl::handle_setopt(h1,
-                        userpwd = sprintf("%s:%s", username, password),
-                        ftp_use_epsv = TRUE,
-                        connecttimeout = 30L,
-                        low_speed_time = 30L,
-                        low_speed_limit = 1L,
-                        verbose = isTRUE(verbose)
+    curl::handle_setopt(
+        h1,
+        userpwd = sprintf("%s:%s", username, password),
+        ftp_use_epsv = TRUE,
+        connecttimeout = 30L,
+        low_speed_time = 30L,
+        low_speed_limit = 1L,
+        verbose = isTRUE(verbose)
     )
 
     # Attempt 2: explicit TLS over FTP:21
     file_url_ftp_explicit = sprintf("ftp://%s/%s", host, path)
     h2 = curl::new_handle()
-    curl::handle_setopt(h2,
-                        userpwd = sprintf("%s:%s", username, password),
-                        ftp_use_epsv = TRUE,
-                        use_ssl = 3L,  # CURLUSESSL_ALL
-                        connecttimeout = 30L,
-                        low_speed_time = 30L,
-                        low_speed_limit = 1L,
-                        verbose = isTRUE(verbose)
+    curl::handle_setopt(
+        h2,
+        userpwd = sprintf("%s:%s", username, password),
+        ftp_use_epsv = TRUE,
+        use_ssl = 3L, # CURLUSESSL_ALL
+        connecttimeout = 30L,
+        low_speed_time = 30L,
+        low_speed_limit = 1L,
+        verbose = isTRUE(verbose)
     )
 
     .try_download = function(url, handle) {
         for (i in seq_len(tries)) {
-            ok = tryCatch({
-                curl::curl_download(url, output_file, handle = handle, mode = "wb")
-                TRUE
-            }, error = function(e) {
-                if (isTRUE(verbose)) .msg_err(sprintf("[ERROR] Try %d failed: %s", i, e$message))
-                FALSE
-            })
-            if (ok) return(TRUE)
+            ok = tryCatch(
+                {
+                    curl::curl_download(
+                        url,
+                        output_file,
+                        handle = handle,
+                        mode = "wb"
+                    )
+                    TRUE
+                },
+                error = function(e) {
+                    if (isTRUE(verbose)) {
+                        .msg_err(sprintf(
+                            "[ERROR] Try %d failed: %s",
+                            i,
+                            e$message
+                        ))
+                    }
+                    FALSE
+                }
+            )
+            if (ok) {
+                return(TRUE)
+            }
             Sys.sleep(1)
         }
         FALSE
@@ -1516,11 +2220,17 @@ gme_other_download_file = function(filename,
 
     downloaded = .try_download(file_url_ftps, h1)
     if (!downloaded) {
-        if (isTRUE(verbose)) .msg_err("Implicit FTPS failed; trying explicit TLS on ftp:// ...")
+        if (isTRUE(verbose)) {
+            .msg_err("Implicit FTPS failed; trying explicit TLS on ftp:// ...")
+        }
         downloaded = .try_download(file_url_ftp_explicit, h2)
     }
     if (!downloaded) {
-        .msg_err(sprintf("[ERROR] Download failed for %s (%s)", filename, data_type))
+        .msg_err(sprintf(
+            "[ERROR] Download failed for %s (%s)",
+            filename,
+            data_type
+        ))
         return(NULL)
     }
 
@@ -1528,34 +2238,100 @@ gme_other_download_file = function(filename,
 
     # ---- post-processing ----
     if (isFALSE(raw)) {
-        result_df = tryCatch({
-            df =
-                if (data_type == "MSD_ServiziDispacciamento") {
-                    out = gme_msd_all_xml_to_data(output_file)
-                    setcolorder(out, c("DATE","TIME","HOUR","MARKET","ZONE","VARIABLE","VALUE","UNIT"))
-                    out
-                } else if (data_type == "MB_PRiservaSecondaria") {
-                    out = gme_mb_rs_xml_to_data(output_file)
-                    setcolorder(out, c("DATE","TIME","HOUR","MARKET","ZONE","VARIABLE","FIELD","VALUE","UNIT"))
-                    out
-                } else if (data_type == "MB_PAltriServizi") {
-                    out = gme_mb_as_xml_to_data(output_file)
-                    setcolorder(out, c("DATE","TIME","HOUR","MARKET","ZONE","VARIABLE","FIELD","VALUE","UNIT"))
-                    out
-                } else if (data_type == "MB_PTotali") {
-                    out = gme_mb_tl_xml_to_data(output_file)
-                    setcolorder(out, c("DATE","TIME","HOUR","MARKET","ZONE","VARIABLE","FIELD","VALUE","UNIT"))
-                    out
-                } else if (data_type == "XBID_EsitiTotali") {
-                    out = gme_xbid_all_xml_to_data(output_file)
-                    setcolorder(out, c("DATE","TIME","HOUR","MARKET","ZONE","VARIABLE","VALUE","UNIT"))
-                    out
-                }
-            df
-        }, error = function(e) {
-            .msg_err("[ERROR] XML processing failed: ", e$message)
-            NULL
-        })
+        result_df = tryCatch(
+            {
+                df =
+                    if (data_type == "MSD_ServiziDispacciamento") {
+                        out = gme_msd_all_xml_to_data(output_file)
+                        setcolorder(
+                            out,
+                            c(
+                                "DATE",
+                                "TIME",
+                                "HOUR",
+                                "MARKET",
+                                "ZONE",
+                                "VARIABLE",
+                                "VALUE",
+                                "UNIT"
+                            )
+                        )
+                        out
+                    } else if (data_type == "MB_PRiservaSecondaria") {
+                        out = gme_mb_rs_xml_to_data(output_file)
+                        setcolorder(
+                            out,
+                            c(
+                                "DATE",
+                                "TIME",
+                                "HOUR",
+                                "MARKET",
+                                "ZONE",
+                                "VARIABLE",
+                                "FIELD",
+                                "VALUE",
+                                "UNIT"
+                            )
+                        )
+                        out
+                    } else if (data_type == "MB_PAltriServizi") {
+                        out = gme_mb_as_xml_to_data(output_file)
+                        setcolorder(
+                            out,
+                            c(
+                                "DATE",
+                                "TIME",
+                                "HOUR",
+                                "MARKET",
+                                "ZONE",
+                                "VARIABLE",
+                                "FIELD",
+                                "VALUE",
+                                "UNIT"
+                            )
+                        )
+                        out
+                    } else if (data_type == "MB_PTotali") {
+                        out = gme_mb_tl_xml_to_data(output_file)
+                        setcolorder(
+                            out,
+                            c(
+                                "DATE",
+                                "TIME",
+                                "HOUR",
+                                "MARKET",
+                                "ZONE",
+                                "VARIABLE",
+                                "FIELD",
+                                "VALUE",
+                                "UNIT"
+                            )
+                        )
+                        out
+                    } else if (data_type == "XBID_EsitiTotali") {
+                        out = gme_xbid_all_xml_to_data(output_file)
+                        setcolorder(
+                            out,
+                            c(
+                                "DATE",
+                                "TIME",
+                                "HOUR",
+                                "MARKET",
+                                "ZONE",
+                                "VARIABLE",
+                                "VALUE",
+                                "UNIT"
+                            )
+                        )
+                        out
+                    }
+                df
+            },
+            error = function(e) {
+                .msg_err("[ERROR] XML processing failed: ", e$message)
+                NULL
+            }
+        )
 
         if (is.null(result_df)) {
             .msg_err("[ERROR] An error occurred; result_df is NULL.")
@@ -1566,14 +2342,11 @@ gme_other_download_file = function(filename,
         # Remove the raw file after parsing
         try(suppressWarnings(file.remove(output_file)), silent = TRUE)
         return(result_df)
-
     } else {
         .msg_ok("[OK] XML File at: ", output_file)
         return(TRUE)
     }
 }
-
-
 
 
 #' Process GME Other Markets MSD XML Data
@@ -1617,7 +2390,6 @@ gme_other_download_file = function(filename,
 #' @import xml2
 #' @export
 gme_msd_all_xml_to_data <- function(xml_file_path) {
-
     # Read the XML file
     xml_data <- read_xml(xml_file_path)
 
@@ -1662,15 +2434,27 @@ gme_msd_all_xml_to_data <- function(xml_file_path) {
 
     # Separate ZONE and VARIABLE
     melted_data[, `:=`(
-        ZONE = ifelse(grepl("_", ZONE_VARIABLE), sub("_.*", "", ZONE_VARIABLE), "TOTAL"),
-        VARIABLE = ifelse(grepl("_", ZONE_VARIABLE), sub(".*_", "", ZONE_VARIABLE), ZONE_VARIABLE)
+        ZONE = ifelse(
+            grepl("_", ZONE_VARIABLE),
+            sub("_.*", "", ZONE_VARIABLE),
+            "TOTAL"
+        ),
+        VARIABLE = ifelse(
+            grepl("_", ZONE_VARIABLE),
+            sub(".*_", "", ZONE_VARIABLE),
+            ZONE_VARIABLE
+        )
     )]
     # Assign units
 
     melted_data[, UNIT := ifelse(grepl("MWh", VARIABLE), "MWh", "EUR")]
     melted_data[, ZONE_VARIABLE := NULL]
     melted_data[, TIME := paste0(sprintf("%02d", as.numeric(Ora)), ":00")]
-    setnames(melted_data, c('Data', 'Mercato', 'Ora'), c('DATE', 'MARKET', 'HOUR'))
+    setnames(
+        melted_data,
+        c('Data', 'Mercato', 'Ora'),
+        c('DATE', 'MARKET', 'HOUR')
+    )
 
     return(melted_data)
 }
@@ -1717,7 +2501,6 @@ gme_msd_all_xml_to_data <- function(xml_file_path) {
 #' @import xml2
 #' @export
 gme_mb_rs_xml_to_data <- function(xml_file_path) {
-
     # Read the XML file
     xml_data <- read_xml(xml_file_path)
 
@@ -1759,10 +2542,13 @@ gme_mb_rs_xml_to_data <- function(xml_file_path) {
         )]
     }
 
-    combined_data[, RESOLUTION_TYPE := fifelse(
-        .N == 24, "60M",
-        fifelse(.N == 96, "15M", "OTHER")
-    )]
+    combined_data[,
+        RESOLUTION_TYPE := fifelse(
+            .N == 24,
+            "60M",
+            fifelse(.N == 96, "15M", "OTHER")
+        )
+    ]
 
     # Tidy the data for analysis
     melted_data <- melt(
@@ -1775,17 +2561,36 @@ gme_mb_rs_xml_to_data <- function(xml_file_path) {
 
     # Separate ZONE and VARIABLE
     melted_data[, `:=`(
-        ZONE = ifelse(lengths(strsplit(ZONE_VARIABLE, "_")) == 1, "TOTAL", sapply(strsplit(ZONE_VARIABLE, "_"), `[`, 1)),  # First element or "TOTAL"
-        VARIABLE = ifelse(lengths(strsplit(ZONE_VARIABLE, "_")) == 1, ZONE_VARIABLE,
-                          ifelse(lengths(strsplit(ZONE_VARIABLE, "_")) >= 2, sapply(strsplit(ZONE_VARIABLE, "_"), `[`, 2), NA)),  # Second element or entire value if length is 1
-        FIELD = ifelse(lengths(strsplit(ZONE_VARIABLE, "_")) == 3, sapply(strsplit(ZONE_VARIABLE, "_"), `[`, 3), NA)  # Third element or NA
+        ZONE = ifelse(
+            lengths(strsplit(ZONE_VARIABLE, "_")) == 1,
+            "TOTAL",
+            sapply(strsplit(ZONE_VARIABLE, "_"), `[`, 1)
+        ), # First element or "TOTAL"
+        VARIABLE = ifelse(
+            lengths(strsplit(ZONE_VARIABLE, "_")) == 1,
+            ZONE_VARIABLE,
+            ifelse(
+                lengths(strsplit(ZONE_VARIABLE, "_")) >= 2,
+                sapply(strsplit(ZONE_VARIABLE, "_"), `[`, 2),
+                NA
+            )
+        ), # Second element or entire value if length is 1
+        FIELD = ifelse(
+            lengths(strsplit(ZONE_VARIABLE, "_")) == 3,
+            sapply(strsplit(ZONE_VARIABLE, "_"), `[`, 3),
+            NA
+        ) # Third element or NA
     )]
     # Assign units
 
     melted_data[, UNIT := ifelse(grepl("MWh", VARIABLE), "MWh", "EUR")]
     melted_data[, ZONE_VARIABLE := NULL]
     melted_data[, TIME := paste0(sprintf("%02d", as.numeric(Ora)), ":00")]
-    setnames(melted_data, c('Data', 'Mercato', 'Ora', 'Periodo'), c('DATE', 'MARKET', 'HOUR', 'PERIOD'))
+    setnames(
+        melted_data,
+        c('Data', 'Mercato', 'Ora', 'Periodo'),
+        c('DATE', 'MARKET', 'HOUR', 'PERIOD')
+    )
     melted_data[, MARKET := 'MB Riserva Secondaria']
 
     return(melted_data)
@@ -1833,7 +2638,6 @@ gme_mb_rs_xml_to_data <- function(xml_file_path) {
 #' @import xml2
 #' @export
 gme_mb_as_xml_to_data <- function(xml_file_path) {
-
     # Read the XML file
     xml_data <- read_xml(xml_file_path)
 
@@ -1853,7 +2657,6 @@ gme_mb_as_xml_to_data <- function(xml_file_path) {
         dt <- data.table::data.table(
             FIELD = field_names,
             VALUE = gsub(",", ".", field_values)
-
         )
         # Reshape to wide format
         data.table::dcast(dt, . ~ FIELD, value.var = "VALUE")[, . := NULL] # Drop placeholder column '.'
@@ -1876,10 +2679,13 @@ gme_mb_as_xml_to_data <- function(xml_file_path) {
         )]
     }
 
-    combined_data[, RESOLUTION_TYPE := fifelse(
-        .N == 24, "60M",
-        fifelse(.N == 96, "15M", "OTHER")
-    )]
+    combined_data[,
+        RESOLUTION_TYPE := fifelse(
+            .N == 24,
+            "60M",
+            fifelse(.N == 96, "15M", "OTHER")
+        )
+    ]
 
     # Tidy the data for analysis
     melted_data <- melt(
@@ -1892,17 +2698,36 @@ gme_mb_as_xml_to_data <- function(xml_file_path) {
 
     # Separate ZONE and VARIABLE
     melted_data[, `:=`(
-        ZONE = ifelse(lengths(strsplit(ZONE_VARIABLE, "_")) == 1, "TOTAL", sapply(strsplit(ZONE_VARIABLE, "_"), `[`, 1)),  # First element or "TOTAL"
-        VARIABLE = ifelse(lengths(strsplit(ZONE_VARIABLE, "_")) == 1, ZONE_VARIABLE,
-                          ifelse(lengths(strsplit(ZONE_VARIABLE, "_")) >= 2, sapply(strsplit(ZONE_VARIABLE, "_"), `[`, 2), NA)),  # Second element or entire value if length is 1
-        FIELD = ifelse(lengths(strsplit(ZONE_VARIABLE, "_")) == 3, sapply(strsplit(ZONE_VARIABLE, "_"), `[`, 3), NA)  # Third element or NA
+        ZONE = ifelse(
+            lengths(strsplit(ZONE_VARIABLE, "_")) == 1,
+            "TOTAL",
+            sapply(strsplit(ZONE_VARIABLE, "_"), `[`, 1)
+        ), # First element or "TOTAL"
+        VARIABLE = ifelse(
+            lengths(strsplit(ZONE_VARIABLE, "_")) == 1,
+            ZONE_VARIABLE,
+            ifelse(
+                lengths(strsplit(ZONE_VARIABLE, "_")) >= 2,
+                sapply(strsplit(ZONE_VARIABLE, "_"), `[`, 2),
+                NA
+            )
+        ), # Second element or entire value if length is 1
+        FIELD = ifelse(
+            lengths(strsplit(ZONE_VARIABLE, "_")) == 3,
+            sapply(strsplit(ZONE_VARIABLE, "_"), `[`, 3),
+            NA
+        ) # Third element or NA
     )]
     # Assign units
 
     melted_data[, UNIT := ifelse(grepl("MWh", VARIABLE), "MWh", "EUR")]
     melted_data[, ZONE_VARIABLE := NULL]
     melted_data[, TIME := paste0(sprintf("%02d", as.numeric(Ora)), ":00")]
-    setnames(melted_data, c('Data', 'Mercato', 'Ora', 'Periodo'), c('DATE', 'MARKET', 'HOUR', 'PERIOD'))
+    setnames(
+        melted_data,
+        c('Data', 'Mercato', 'Ora', 'Periodo'),
+        c('DATE', 'MARKET', 'HOUR', 'PERIOD')
+    )
     melted_data[, MARKET := 'MB Altri Servizi']
 
     return(melted_data)
@@ -1950,7 +2775,6 @@ gme_mb_as_xml_to_data <- function(xml_file_path) {
 #' @import xml2
 #' @export
 gme_mb_tl_xml_to_data <- function(xml_file_path) {
-
     # Read the XML file
     xml_data <- read_xml(xml_file_path)
 
@@ -1992,10 +2816,13 @@ gme_mb_tl_xml_to_data <- function(xml_file_path) {
         )]
     }
 
-    combined_data[, RESOLUTION_TYPE := fifelse(
-        .N == 24, "60M",
-        fifelse(.N == 96, "15M", "OTHER")
-    )]
+    combined_data[,
+        RESOLUTION_TYPE := fifelse(
+            .N == 24,
+            "60M",
+            fifelse(.N == 96, "15M", "OTHER")
+        )
+    ]
 
     # Tidy the data for analysis
     melted_data <- melt(
@@ -2008,26 +2835,48 @@ gme_mb_tl_xml_to_data <- function(xml_file_path) {
 
     # Separate ZONE and VARIABLE
     melted_data[, `:=`(
-        ZONE = ifelse(lengths(strsplit(ZONE_VARIABLE, "_")) == 1, "TOTAL", sapply(strsplit(ZONE_VARIABLE, "_"), `[`, 1)),  # First element or "TOTAL"
-        VARIABLE = ifelse(lengths(strsplit(ZONE_VARIABLE, "_")) == 1, ZONE_VARIABLE,
-                          ifelse(lengths(strsplit(ZONE_VARIABLE, "_")) >= 2, sapply(strsplit(ZONE_VARIABLE, "_"), `[`, 2), NA)),  # Second element or entire value if length is 1
-        FIELD = ifelse(lengths(strsplit(ZONE_VARIABLE, "_")) == 3, sapply(strsplit(ZONE_VARIABLE, "_"), `[`, 3), NA)  # Third element or NA
+        ZONE = ifelse(
+            lengths(strsplit(ZONE_VARIABLE, "_")) == 1,
+            "TOTAL",
+            sapply(strsplit(ZONE_VARIABLE, "_"), `[`, 1)
+        ), # First element or "TOTAL"
+        VARIABLE = ifelse(
+            lengths(strsplit(ZONE_VARIABLE, "_")) == 1,
+            ZONE_VARIABLE,
+            ifelse(
+                lengths(strsplit(ZONE_VARIABLE, "_")) >= 2,
+                sapply(strsplit(ZONE_VARIABLE, "_"), `[`, 2),
+                NA
+            )
+        ), # Second element or entire value if length is 1
+        FIELD = ifelse(
+            lengths(strsplit(ZONE_VARIABLE, "_")) == 3,
+            sapply(strsplit(ZONE_VARIABLE, "_"), `[`, 3),
+            NA
+        ) # Third element or NA
     )]
     # Assign units
 
     melted_data[, UNIT := ifelse(grepl("MWh", VARIABLE), "MWh", "EUR")]
     melted_data[, ZONE_VARIABLE := NULL]
     melted_data[, TIME := paste0(sprintf("%02d", as.numeric(Ora)), ":00")]
-    setnames(melted_data, c('Data', 'Mercato', 'Ora', 'Periodo'), c('DATE', 'MARKET', 'HOUR', 'PERIOD'))
-    melted_data[, RESOLUTION_TYPE := fifelse(
-        .N == 24, "60M",
-        fifelse(.N == 96, "15M", "OTHER")
-    ), by = MARKET]
+    setnames(
+        melted_data,
+        c('Data', 'Mercato', 'Ora', 'Periodo'),
+        c('DATE', 'MARKET', 'HOUR', 'PERIOD')
+    )
+    melted_data[,
+        RESOLUTION_TYPE := fifelse(
+            .N == 24,
+            "60M",
+            fifelse(.N == 96, "15M", "OTHER")
+        ),
+        by = MARKET
+    ]
     melted_data[, MARKET := 'MB Totali']
 
     return(melted_data)
 }
-
 
 
 #' Process GME Other Markets XBID XML Data
@@ -2071,7 +2920,6 @@ gme_mb_tl_xml_to_data <- function(xml_file_path) {
 #' @import xml2
 #' @export
 gme_xbid_all_xml_to_data <- function(xml_file_path) {
-
     # Read the XML file
     xml_data <- read_xml(xml_file_path)
 
@@ -2146,7 +2994,6 @@ gme_xbid_all_xml_to_data <- function(xml_file_path) {
 }
 
 
-
 # PUBBLIC OFFERS ---------------------------------------
 
 #' Retrieve Files from GME FTP Server for DAM market pubblic offers
@@ -2169,31 +3016,46 @@ gme_xbid_all_xml_to_data <- function(xml_file_path) {
 #' files <- gme_mgp_get_files(data_type = "MGP_Prezzi", verbose = TRUE)
 #' }
 #' @export
-gme_offers_get_files = function(data_type,
-                                output_dir = "data",
-                                username = "PIASARACENO",
-                                password = "18N15C9R",
-                                host = "download.ipex.it",
-                                verbose = FALSE) {
-
-    allowed_data_types = c("MGP","MSD","MB","MI-A1","MI-A2","MI-A3","XBID")
+gme_offers_get_files = function(
+    data_type,
+    output_dir = "data",
+    username = "PIASARACENO",
+    password = "18N15C9R",
+    host = "download.ipex.it",
+    verbose = FALSE
+) {
+    allowed_data_types = c(
+        "MGP",
+        "MSD",
+        "MB",
+        "MI-A1",
+        "MI-A2",
+        "MI-A3",
+        "XBID"
+    )
     if (!data_type %in% allowed_data_types) {
-        stop(paste("Invalid data_type:", data_type,
-                   ". Must be one of:", paste(allowed_data_types, collapse = ", ")))
+        stop(paste(
+            "Invalid data_type:",
+            data_type,
+            ". Must be one of:",
+            paste(allowed_data_types, collapse = ", ")
+        ))
     }
 
     patterns = list(
-        MGP   = "\\S+MGPOffertePubbliche\\.zip$",
-        MSD   = "\\S+MSDOffertePubbliche\\.zip$",
-        MB    = "\\S+MBOffertePubbliche\\.zip$",
+        MGP = "\\S+MGPOffertePubbliche\\.zip$",
+        MSD = "\\S+MSDOffertePubbliche\\.zip$",
+        MB = "\\S+MBOffertePubbliche\\.zip$",
         `MI-A1` = "\\S+MI-A1OffertePubbliche\\.zip$",
         `MI-A2` = "\\S+MI-A2OffertePubbliche\\.zip$",
         `MI-A3` = "\\S+MI-A3OffertePubbliche\\.zip$",
-        XBID  = "\\S+XBIDOffertePubbliche\\.zip$"
+        XBID = "\\S+XBIDOffertePubbliche\\.zip$"
     )
     file_pattern = patterns[[data_type]]
 
-    if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
+    if (!dir.exists(output_dir)) {
+        dir.create(output_dir, recursive = TRUE)
+    }
 
     # Path must end with a single trailing slash
     path = sprintf("MercatiElettrici/%s_OffertePubbliche/", data_type)
@@ -2201,27 +3063,47 @@ gme_offers_get_files = function(data_type,
     # 1) implicit FTPS (port 990)
     url_ftps = sprintf("ftps://%s/%s", host, path)
     args1 = c(
-        "-sS", "--fail", "--ftp-pasv", "--list-only",
-        "-u", sprintf("%s:%s", username, password),
+        "-sS",
+        "--fail",
+        "--ftp-pasv",
+        "--list-only",
+        "-u",
+        sprintf("%s:%s", username, password),
         url_ftps
     )
-    out = tryCatch(system2("curl", args1, stdout = TRUE, stderr = TRUE),
-                   error = function(e) structure(conditionMessage(e), class = "curl_err"))
+    out = tryCatch(
+        system2("curl", args1, stdout = TRUE, stderr = TRUE),
+        error = function(e) structure(conditionMessage(e), class = "curl_err")
+    )
 
     # 2) fallback: explicit TLS over FTP:21
     if (inherits(out, "curl_err") || length(out) == 0) {
         url_ftp = sprintf("ftp://%s/%s", host, path)
         args2 = c(
-            "-sS", "--fail", "--ftp-pasv", "--list-only", "--ssl",
-            "-u", sprintf("%s:%s", username, password),
+            "-sS",
+            "--fail",
+            "--ftp-pasv",
+            "--list-only",
+            "--ssl",
+            "-u",
+            sprintf("%s:%s", username, password),
             url_ftp
         )
-        out = tryCatch(system2("curl", args2, stdout = TRUE, stderr = TRUE),
-                       error = function(e) structure(conditionMessage(e), class = "curl_err"))
+        out = tryCatch(
+            system2("curl", args2, stdout = TRUE, stderr = TRUE),
+            error = function(e) {
+                structure(conditionMessage(e), class = "curl_err")
+            }
+        )
     }
 
     if (inherits(out, "curl_err") || length(out) == 0) {
-        stop(paste0("Directory listing failed for ", data_type, ". Curl said:\n", paste(out, collapse = "\n")))
+        stop(paste0(
+            "Directory listing failed for ",
+            data_type,
+            ". Curl said:\n",
+            paste(out, collapse = "\n")
+        ))
     }
 
     files = out[nchar(out) > 0]
@@ -2241,7 +3123,6 @@ gme_offers_get_files = function(data_type,
 
     return(files)
 }
-
 
 
 #' Download and Process MGP Data File
@@ -2272,73 +3153,138 @@ gme_offers_get_files = function(data_type,
 #' @import data.table
 #' @importFrom xml2 read_xml xml_find_all xml_text
 #' @export
-gme_download_offers_file = function(filename,
-                                    data_type = "MGP",
-                                    output_dir,
-                                    username,
-                                    password,
-                                    raw = FALSE,
-                                    host = "download.ipex.it",
-                                    verbose = FALSE,
-                                    tries = 2) {
-
-    allowed_data_types = c("MGP","MSD","MB","MI-A1","MI-A2","MI-A3","XBID")
+gme_download_offers_file = function(
+    filename,
+    data_type = "MGP",
+    output_dir,
+    username,
+    password,
+    raw = FALSE,
+    host = "download.ipex.it",
+    verbose = FALSE,
+    tries = 2
+) {
+    allowed_data_types = c(
+        "MGP",
+        "MSD",
+        "MB",
+        "MI-A1",
+        "MI-A2",
+        "MI-A3",
+        "XBID"
+    )
     if (!data_type %in% allowed_data_types) {
-        stop(paste("Invalid data_type:", data_type, ". Must be one of:", paste(allowed_data_types, collapse = ", ")))
+        stop(paste(
+            "Invalid data_type:",
+            data_type,
+            ". Must be one of:",
+            paste(allowed_data_types, collapse = ", ")
+        ))
     }
 
-    validated_filename = gme_validate_filename(filename = filename, num_digits = 8, file_extension = "zip")
+    validated_filename = gme_validate_filename(
+        filename = filename,
+        num_digits = 8,
+        file_extension = "zip"
+    )
     if (!isTRUE(validated_filename)) {
-        if (requireNamespace("crayon", quietly = TRUE)) message(crayon::red("[ERROR] Wrong Filename")) else message("[ERROR] Wrong Filename")
+        if (requireNamespace("crayon", quietly = TRUE)) {
+            message(crayon::red("[ERROR] Wrong Filename"))
+        } else {
+            message("[ERROR] Wrong Filename")
+        }
         return(NULL)
     }
 
-    if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
+    if (!dir.exists(output_dir)) {
+        dir.create(output_dir, recursive = TRUE)
+    }
     zip_path = file.path(output_dir, filename)
-    extract_dir = file.path(output_dir, tools::file_path_sans_ext(basename(filename)))
-    if (!dir.exists(extract_dir)) dir.create(extract_dir, recursive = TRUE)
+    extract_dir = file.path(
+        output_dir,
+        tools::file_path_sans_ext(basename(filename))
+    )
+    if (!dir.exists(extract_dir)) {
+        dir.create(extract_dir, recursive = TRUE)
+    }
 
-    .ok  = function(...) if (requireNamespace("crayon", quietly = TRUE)) message(crayon::green(...)) else message(...)
-    .err = function(...) if (requireNamespace("crayon", quietly = TRUE)) message(crayon::red(...))   else message(...)
-    .warn= function(...) if (requireNamespace("crayon", quietly = TRUE)) message(crayon::yellow(...)) else message(...)
+    .ok = function(...) {
+        if (requireNamespace("crayon", quietly = TRUE)) {
+            message(crayon::green(...))
+        } else {
+            message(...)
+        }
+    }
+    .err = function(...) {
+        if (requireNamespace("crayon", quietly = TRUE)) {
+            message(crayon::red(...))
+        } else {
+            message(...)
+        }
+    }
+    .warn = function(...) {
+        if (requireNamespace("crayon", quietly = TRUE)) {
+            message(crayon::yellow(...))
+        } else {
+            message(...)
+        }
+    }
 
-    path = sprintf("MercatiElettrici/%s_OffertePubbliche/%s", data_type, filename)
+    path = sprintf(
+        "MercatiElettrici/%s_OffertePubbliche/%s",
+        data_type,
+        filename
+    )
 
     # Attempt 1: implicit FTPS (990)
     url_ftps = sprintf("ftps://%s/%s", host, path)
     h1 = curl::new_handle()
-    curl::handle_setopt(h1,
-                        userpwd = sprintf("%s:%s", username, password),
-                        ftp_use_epsv = TRUE,
-                        connecttimeout = 30L,
-                        low_speed_time = 30L,
-                        low_speed_limit = 1L,
-                        verbose = isTRUE(verbose)
+    curl::handle_setopt(
+        h1,
+        userpwd = sprintf("%s:%s", username, password),
+        ftp_use_epsv = TRUE,
+        connecttimeout = 30L,
+        low_speed_time = 30L,
+        low_speed_limit = 1L,
+        verbose = isTRUE(verbose)
     )
 
     # Attempt 2: explicit TLS on FTP:21
     url_ftp_tls = sprintf("ftp://%s/%s", host, path)
     h2 = curl::new_handle()
-    curl::handle_setopt(h2,
-                        userpwd = sprintf("%s:%s", username, password),
-                        ftp_use_epsv = TRUE,
-                        use_ssl = 3L,  # CURLUSESSL_ALL
-                        connecttimeout = 30L,
-                        low_speed_time = 30L,
-                        low_speed_limit = 1L,
-                        verbose = isTRUE(verbose)
+    curl::handle_setopt(
+        h2,
+        userpwd = sprintf("%s:%s", username, password),
+        ftp_use_epsv = TRUE,
+        use_ssl = 3L, # CURLUSESSL_ALL
+        connecttimeout = 30L,
+        low_speed_time = 30L,
+        low_speed_limit = 1L,
+        verbose = isTRUE(verbose)
     )
 
     .try_download = function(url, handle) {
         for (i in seq_len(tries)) {
-            ok = tryCatch({
-                curl::curl_download(url, zip_path, handle = handle, mode = "wb")
-                TRUE
-            }, error = function(e) {
-                if (isTRUE(verbose)) .err(sprintf("[ERROR] Try %d failed: %s", i, e$message))
-                FALSE
-            })
-            if (ok) return(TRUE)
+            ok = tryCatch(
+                {
+                    curl::curl_download(
+                        url,
+                        zip_path,
+                        handle = handle,
+                        mode = "wb"
+                    )
+                    TRUE
+                },
+                error = function(e) {
+                    if (isTRUE(verbose)) {
+                        .err(sprintf("[ERROR] Try %d failed: %s", i, e$message))
+                    }
+                    FALSE
+                }
+            )
+            if (ok) {
+                return(TRUE)
+            }
             Sys.sleep(1)
         }
         FALSE
@@ -2346,11 +3292,17 @@ gme_download_offers_file = function(filename,
 
     downloaded = .try_download(url_ftps, h1)
     if (!downloaded) {
-        if (isTRUE(verbose)) .warn("Implicit FTPS failed; trying explicit TLS on ftp:// ...")
+        if (isTRUE(verbose)) {
+            .warn("Implicit FTPS failed; trying explicit TLS on ftp:// ...")
+        }
         downloaded = .try_download(url_ftp_tls, h2)
     }
     if (!downloaded) {
-        .err(sprintf("[ERROR] Download failed for %s (%s)", filename, data_type))
+        .err(sprintf(
+            "[ERROR] Download failed for %s (%s)",
+            filename,
+            data_type
+        ))
         return(NULL)
     }
     .ok("File downloaded successfully: ", zip_path)
@@ -2368,29 +3320,44 @@ gme_download_offers_file = function(filename,
         return(NULL)
     }
     tryCatch(unzip(zip_path, exdir = extract_dir), error = function(e) {
-        .err("Unzip failed: ", e$message); return(NULL)
+        .err("Unzip failed: ", e$message)
+        return(NULL)
     })
     # remove the zip after extraction
     try(suppressWarnings(file.remove(zip_path)), silent = TRUE)
 
     # Find XML(s)
-    xml_files = list.files(extract_dir, pattern = "\\.xml$", full.names = TRUE, recursive = TRUE)
+    xml_files = list.files(
+        extract_dir,
+        pattern = "\\.xml$",
+        full.names = TRUE,
+        recursive = TRUE
+    )
     if (length(xml_files) == 0) {
         .err("No XML files found after extracting the zip.")
         return(NULL)
     }
-    if (length(xml_files) > 1) .warn(sprintf("Multiple XML files found (%d). Using the first: %s", length(xml_files), basename(xml_files[1])))
+    if (length(xml_files) > 1) {
+        .warn(sprintf(
+            "Multiple XML files found (%d). Using the first: %s",
+            length(xml_files),
+            basename(xml_files[1])
+        ))
+    }
 
     xml_file = xml_files[1]
 
     if (isFALSE(raw)) {
-        result_df = tryCatch({
-            df = gme_offerts_zip_to_data(xml_file)
-            df
-        }, error = function(e) {
-            .err("[ERROR] XML processing failed: ", e$message)
-            NULL
-        })
+        result_df = tryCatch(
+            {
+                df = gme_offerts_zip_to_data(xml_file)
+                df
+            },
+            error = function(e) {
+                .err("[ERROR] XML processing failed: ", e$message)
+                NULL
+            }
+        )
 
         if (is.null(result_df)) {
             .err("[ERROR] An error occurred; result_df is NULL.")
@@ -2400,15 +3367,16 @@ gme_download_offers_file = function(filename,
         }
 
         # cleanup extracted XML after successful parse
-        try(suppressWarnings(unlink(extract_dir, recursive = TRUE)), silent = TRUE)
+        try(
+            suppressWarnings(unlink(extract_dir, recursive = TRUE)),
+            silent = TRUE
+        )
         return(result_df)
-
     } else {
         .ok("[OK] Raw mode: extracted at: ", extract_dir)
         return(TRUE)
     }
 }
-
 
 
 # Define the function
@@ -2434,7 +3402,6 @@ gme_download_offers_file = function(filename,
 #' @noRd
 
 gme_offerts_zip_to_data <- function(xml_file_path) {
-
     # Read the XML file
     xml_data <- read_xml(xml_file_path)
 
@@ -2456,8 +3423,16 @@ gme_offerts_zip_to_data <- function(xml_file_path) {
                 val <- as.integer(val)
             } else if (el_name == "BID_OFFER_DATE_DT") {
                 this$bid_offer_date_dt_parsed <- as.Date(val, format = "%Y%m%d")
-            } else if (el_name %in% c("QUANTITY_NO", "AWARDED_QUANTITY_NO", "ENERGY_PRICE_NO",
-                                      "ADJ_QUANTITY_NO", "AWARDED_PRICE_NO")) {
+            } else if (
+                el_name %in%
+                    c(
+                        "QUANTITY_NO",
+                        "AWARDED_QUANTITY_NO",
+                        "ENERGY_PRICE_NO",
+                        "ADJ_QUANTITY_NO",
+                        "AWARDED_PRICE_NO"
+                    )
+            ) {
                 val <- as.numeric(val)
             } else if (el_name == "SUBMITTED_DT") {
                 # If SUBMITTED_DT is relevant, process it here
@@ -2472,7 +3447,8 @@ gme_offerts_zip_to_data <- function(xml_file_path) {
         interval_no <- this[["interval_no"]]
         if (!is.null(interval_no) && !is.null(this$bid_offer_date_dt_parsed)) {
             this$time <- as.POSIXct(this$bid_offer_date_dt_parsed) +
-                (interval_no * 3600) - ifelse(interval_no != 25, 60 * 60, 90 * 60)
+                (interval_no * 3600) -
+                ifelse(interval_no != 25, 60 * 60, 90 * 60)
         }
 
         return(this)
@@ -2511,25 +3487,40 @@ gme_offerts_zip_to_data <- function(xml_file_path) {
 #' files <- gme_mgp_get_files(data_type = "MGP_Prezzi", verbose = TRUE)
 #' }
 #' @export
-gme_igi_get_files <- function(data_type, output_dir = "data",
-                               username = "PIASARACENO", password = "18N15C9R",
-                               verbose = FALSE, storico = FALSE, n = 1) {
-
+gme_igi_get_files <- function(
+    data_type,
+    output_dir = "data",
+    username = "PIASARACENO",
+    password = "18N15C9R",
+    verbose = FALSE,
+    storico = FALSE,
+    n = 1
+) {
     allowed_data_types = c("IGI")
 
     # Validate data_type
     if (!data_type %in% allowed_data_types) {
-        stop(paste("Invalid data_type:", data_type,
-                   ". Must be one of:", paste(allowed_data_types, collapse = ", ")))
+        stop(paste(
+            "Invalid data_type:",
+            data_type,
+            ". Must be one of:",
+            paste(allowed_data_types, collapse = ", ")
+        ))
     }
 
     # # Validate filename
     # validated_filename = gme_validate_filename(filename = filename, num_digits = 8, file_extension = "xml")
     # if(isTRUE(validated_filename)) {
 
-    url_base = paste0('ftp://download.mercatoelettrico.org/MercatiGas/MGPGAS_IGI//', data_type, '/')
+    url_base = paste0(
+        'ftp://download.mercatoelettrico.org/MercatiGas/MGPGAS_IGI//',
+        data_type,
+        '/'
+    )
 
-    if (data_type == "IGI") {file_pattern = "\\S+IGI\\.xml$"}
+    if (data_type == "IGI") {
+        file_pattern = "\\S+IGI\\.xml$"
+    }
 
     # Ensure output directory exists
     if (!dir.exists(output_dir)) {
@@ -2537,39 +3528,52 @@ gme_igi_get_files <- function(data_type, output_dir = "data",
     }
 
     # List files and directories on the FTP server
-    tryCatch({
-        # List files and directories in the specified FTP directory
-        ftp_list_cmd <- paste0("curl -u ", username, ":", password, " ftp://download.mercatoelettrico.org/MercatiGas/MGPGAS_IGI/")
-        file_list <- system(ftp_list_cmd, intern = TRUE)
+    tryCatch(
+        {
+            # List files and directories in the specified FTP directory
+            ftp_list_cmd <- paste0(
+                "curl -u ",
+                username,
+                ":",
+                password,
+                " ftp://download.mercatoelettrico.org/MercatiGas/MGPGAS_IGI/"
+            )
+            file_list <- system(ftp_list_cmd, intern = TRUE)
 
-        # Print the list of files and directories in the FTP directory
-        message(crayon::green("[OK] Listing files and directories on FTP server:"))
-        print(file_list)
+            # Print the list of files and directories in the FTP directory
+            message(crayon::green(
+                "[OK] Listing files and directories on FTP server:"
+            ))
+            print(file_list)
 
-        # Match files based on the pattern (files that end with 'IGI.xml')
-        matches <- regexpr(file_pattern, file_list)
-        files <- regmatches(file_list, matches)
-        files_to_download <- files[nzchar(files)]  # Filter out empty matches
+            # Match files based on the pattern (files that end with 'IGI.xml')
+            matches <- regexpr(file_pattern, file_list)
+            files <- regmatches(file_list, matches)
+            files_to_download <- files[nzchar(files)] # Filter out empty matches
 
-        if(isTRUE(verbose)) {
-            message(crayon::green("[OK] Available files:"))
-            print(files_to_download)
+            if (isTRUE(verbose)) {
+                message(crayon::green("[OK] Available files:"))
+                print(files_to_download)
+            }
+        },
+        error = function(e) {
+            message(crayon::red(
+                "[ERROR] Error downloading files from FTP server",
+                e$message
+            ))
+            return(NULL)
         }
-    }, error = function(e) {
-        message(crayon::red("[ERROR] Error downloading files from FTP server", e$message))
-        return(NULL)
-    })
+    )
 
     return(files_to_download)
 
     # } else {
     #     message(crayon::red("[ERROR] Wrong Filename"))
     # }
-
 }
 
 
- #' Validate Filename Structure
+#' Validate Filename Structure
 #'
 #' This function checks whether a given filename matches a specific structure based on
 #' the number of leading digits, a middle expression, and the file extension.
@@ -2593,7 +3597,11 @@ gme_igi_get_files <- function(data_type, output_dir = "data",
 #' gme_validate_filename("2024MGPPrezzi.txt", num_digits = 4, file_extension = "txt") # Returns TRUE
 #'
 #' @export
-gme_validate_filename = function(filename, num_digits = 8, file_extension = "xml") {
+gme_validate_filename = function(
+    filename,
+    num_digits = 8,
+    file_extension = "xml"
+) {
     # Build the regular expression dynamically
     pattern = paste0("^\\d{", num_digits, "}.*\\.", file_extension, "$")
 
@@ -2603,4 +3611,3 @@ gme_validate_filename = function(filename, num_digits = 8, file_extension = "xml
     }
     return(TRUE)
 }
-
