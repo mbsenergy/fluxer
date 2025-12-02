@@ -1143,7 +1143,7 @@ gme_dam_tran_xml_to_data <- function(xml_file_path) {
     melted_data[, VALUE := as.numeric(gsub(",", ".", VALUE))]
     melted_data[, UNIT := 'MWh']
 
-    melted_data = unique(melted_data)
+    # melted_data = unique(melted_data)
 
     return(melted_data)
 }
@@ -1247,7 +1247,7 @@ gme_dam_limtran_xml_to_data <- function(xml_file_path) {
     melted_data[, VARIABLE := as.character(VARIABLE)]
     melted_data[, UNIT := 'MW']
 
-    melted_data = unique(melted_data)
+    # melted_data = unique(melted_data)
 
     return(melted_data)
 }
