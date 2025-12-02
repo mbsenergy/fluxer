@@ -586,7 +586,7 @@ gme_dam_price_xml_to_data <- function(xml_file_path) {
     data_df_lg[, VALUE := as.numeric(gsub(",", ".", VALUE))]
     data_df_lg[, UNIT := 'EUR']
 
-    data_df_lg = unique(data_df_lg)
+    # data_df_lg = unique(data_df_lg)
 
     return(data_df_lg)
 }
@@ -976,7 +976,7 @@ gme_dam_fabb_xml_to_data <- function(xml_file_path) {
     data_df_lg[, VALUE := as.numeric(gsub(",", ".", VALUE))]
     data_df_lg[, UNIT := 'MWh']
 
-    data_df_lg = unique(data_df_lg)
+    # data_df_lg = unique(data_df_lg)
 
     return(data_df_lg)
 }
@@ -1054,7 +1054,7 @@ gme_dam_liq_xml_to_data <- function(xml_file_path) {
     data_df_lg[, VALUE := as.numeric(gsub(",", ".", VALUE))]
     data_df_lg[, UNIT := 'MWh']
 
-    data_df_lg = unique(data_df_lg)
+    # data_df_lg = unique(data_df_lg)
 
     return(data_df_lg)
 }
@@ -1747,7 +1747,7 @@ gme_mi_price_xml_to_data <- function(xml_file_path) {
     data_df_lg[, VALUE := as.numeric(gsub(",", ".", VALUE))]
     data_df_lg[, UNIT := 'EUR']
 
-    data_df_lg = unique(data_df_lg)
+    # data_df_lg = unique(data_df_lg)
 
     return(data_df_lg)
 }
@@ -1932,7 +1932,7 @@ gme_mi_qty_xml_to_data <- function(xml_file_path) {
     # Add unit for the values
     data_dt_long[, UNIT := "MWh"]
 
-    data_dt_long = unique(data_dt_long)
+    # data_dt_long = unique(data_dt_long)
 
     return(data_dt_long)
 }
